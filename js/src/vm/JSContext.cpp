@@ -859,6 +859,11 @@ bool InternalJobQueue::getHostDefinedData(
   return true;
 }
 
+JS_PUBLIC_API void js::ResetMathRandomSeed(JSContext* cx) {
+  MOZ_ASSERT(cx->realm());
+  cx->realm()->resetRandomNumberGenerator();
+}
+
 bool InternalJobQueue::enqueuePromiseJob(JSContext* cx,
                                          JS::HandleObject promise,
                                          JS::HandleObject job,
