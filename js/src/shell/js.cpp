@@ -847,6 +847,12 @@ bool shell::enableTestWasmAwaitTier2 = false;
 bool shell::enableSourcePragmas = true;
 bool shell::enableAsyncStacks = false;
 bool shell::enableAsyncStackCaptureDebuggeeOnly = false;
+bool shell::enableStreams = false;
+bool shell::enableReadableByteStreams = false;
+bool shell::enableBYOBStreamReaders = false;
+bool shell::enableWritableStreams = false;
+bool shell::enableReadableStreamPipeTo = false;
+bool shell::enableWeakRefs = false;
 bool shell::enableToSource = false;
 #ifdef JS_GC_ZEAL
 uint32_t shell::gZealBits = 0;
@@ -4552,6 +4558,7 @@ static void SetStandardRealmOptions(JS::RealmOptions& options) {
   options.creationOptions()
       .setSharedMemoryAndAtomicsEnabled(enableSharedMemory)
       .setCoopAndCoepEnabled(false)
+      .setStreamsEnabled(enableStreams)
       .setToSourceEnabled(enableToSource);
 }
 
@@ -12944,6 +12951,20 @@ bool InitOptionParser(OptionParser& op) {
       !op.addBoolOption('\0', "less-debug-code",
                         "Emit less machine code for "
                         "checking assertions under DEBUG.") ||
+      !op.addBoolOption('\0', "enable-streams",
+                        "Enable WHATWG Streams (default)") ||
+      !op.addBoolOption('\0', "no-streams", "Disable WHATWG Streams") ||
+      !op.addBoolOption('\0', "enable-readable-byte-streams",
+                        "Enable support for WHATWG ReadableStreams of type "
+                        "'bytes'") ||
+      !op.addBoolOption('\0', "enable-byob-stream-readers",
+                        "Enable support for getting BYOB readers for WHATWG "
+                        "ReadableStreams of type \"bytes\"") ||
+      !op.addBoolOption('\0', "enable-writable-streams",
+                        "Enable support for WHATWG WritableStreams") ||
+      !op.addBoolOption('\0', "enable-readablestream-pipeto",
+                        "Enable support for "
+                        "WHATWG ReadableStream.prototype.pipeTo") ||
       !op.addBoolOption('\0', "disable-tosource", "Disable toSource/uneval") ||
       !op.addBoolOption('\0', "disable-property-error-message-fix",
                         "Disable fix for the error message when accessing "
@@ -13737,6 +13758,11 @@ bool SetContextWasmOptions(JSContext* cx, const OptionParser& op) {
   }
 
   enableTestWasmAwaitTier2 = op.getBoolOption("test-wasm-await-tier2");
+  enableStreams = !op.getBoolOption("no-streams");
+  enableReadableByteStreams = op.getBoolOption("enable-readable-byte-streams");
+  enableBYOBStreamReaders = op.getBoolOption("enable-byob-stream-readers");
+  enableWritableStreams = op.getBoolOption("enable-writable-streams");
+  enableReadableStreamPipeTo = op.getBoolOption("enable-readablestream-pipeto");
 
   JS::ContextOptionsRef(cx)
       .setAsmJS(enableAsmJS)
