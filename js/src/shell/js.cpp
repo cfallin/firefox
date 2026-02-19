@@ -12716,7 +12716,7 @@ Variant<JSAndShellContext, int> js::shell::ShellMain(int argc, char** argv,
   }
 
   if (!JS::SetLoggingInterface(shellLoggingInterface)) {
-    return 1;
+    return AsVariant(1);
   }
   ParseLoggerOptions();
 

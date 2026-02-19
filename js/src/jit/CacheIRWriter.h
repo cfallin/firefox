@@ -379,6 +379,9 @@ class MOZ_RAII CacheIRWriter : public JS::CustomAutoRooter {
     MOZ_ASSERT(op == nextOperandId_);
     nextOperandId_++;
     numInputOperands_++;
+    if (op >= operandLastUsed_.length()) {
+      buffer_.propagateOOM(operandLastUsed_.resize(op + 1));
+    }
     return op;
   }
 

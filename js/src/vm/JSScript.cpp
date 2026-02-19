@@ -75,6 +75,7 @@
 #include "vm/StringType.h"    // JSString, JSAtom
 #include "vm/Time.h"          // AutoIncrementalTimer
 #include "vm/ToSource.h"      // JS::ValueToSource
+#include "vm/Weval.h"
 #ifdef MOZ_VTUNE
 #  include "vtune/VTuneWrapper.h"
 #endif
@@ -2663,6 +2664,10 @@ bool JSScript::fullyInitFromStencil(
     }
   }
 
+#ifdef ENABLE_JS_PBL_WEVAL
+  pbl::EnqueueScriptSpecialization(script);
+#endif
+
   return true;
 }
 
@@ -3891,3 +3896,9 @@ JS::ubi::Base::Size JS::ubi::Concrete<BaseScript>::size(
 const char* JS::ubi::Concrete<BaseScript>::scriptFilename() const {
   return get().filename();
 }
+
+#ifdef ENABLE_JS_PBL_WEVAL
+void BaseScript::allocWeval() {
+  weval_ = MakeUnique<Weval>();
+}
+#endif
