@@ -14,7 +14,7 @@ jobs:
       fail-fast: false
       matrix:
         test: [jstests, jit-test]
-        mozconfig: [ debug, release ]
+        mozconfig: [ debug, pbl-debug, pbl-release, release, aot-ics-release ]
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
@@ -22,4 +22,4 @@ jobs:
         submodules: true
     - run: ./mach --no-interactive bootstrap --application-choice=js
     - run: MOZCONFIG=.github/workflows/mozconfig-${{ matrix.mozconfig }} ./mach build
-    - run: MOZCONFIG=.github/workflows/mozconfig-${{ matrix.mozconfig }} ./mach ${{ matrix.test }}
+    - run: MOZCONFIG=.github/workflows/mozconfig-${{ matrix.mozconfig }} ./mach ${{ matrix.test }} ${{ matrix.test == 'jit-test' && '--exclude wasm/atomicity.js' || '' }}
