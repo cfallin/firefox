@@ -1,0 +1,1 @@
+GetElem, 2, 2, 5, JSVAL_TYPE_UNKNOWN, 0, , LASTUSED(3) LASTUSED(3) , OP(GuardToObject) ID(0) OP(GuardToInt32) ID(1) OP(GuardClass) ID(0) GUARDCLASSKIND(UnmappedArguments) OP(LoadArgumentsObjectArgResult) ID(0) ID(1) OP(ReturnFromIC)  

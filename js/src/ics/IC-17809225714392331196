@@ -1,0 +1,1 @@
+HasOwn, 2, 2, 5, JSVAL_TYPE_UNKNOWN, 16, STUBFIELD(Value) STUBFIELD(WeakShape) , LASTUSED(1) LASTUSED(2) , OP(GuardToObject) ID(1) OP(GuardSpecificValue) ID(0) OFFSET(0) OP(GuardShape) ID(1) OFFSET(1) OP(LoadBooleanResult) BOOL(0) OP(ReturnFromIC)  

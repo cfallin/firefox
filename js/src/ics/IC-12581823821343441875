@@ -1,0 +1,1 @@
+OptimizeSpreadCall, 1, 1, 6, JSVAL_TYPE_UNKNOWN, 8, STUBFIELD(WeakShape) , LASTUSED(4) , OP(GuardToObject) ID(0) OP(GuardShape) ID(0) OFFSET(0) OP(GuardArrayIsPacked) ID(0) OP(GuardFuse) REALMFUSE(0) OP(LoadObjectResult) ID(0) OP(ReturnFromIC)  
