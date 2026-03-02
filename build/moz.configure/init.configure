@@ -912,6 +912,12 @@ def target_is_linux_or_wasi(target):
 
 
 @depends(target)
+def target_is_wasi(target):
+    if target.kernel == "WASI":
+        return True
+
+
+@depends(target)
 def target_is_android(target):
     if target.os == "Android":
         return True
