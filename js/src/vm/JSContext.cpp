@@ -841,6 +841,11 @@ JS_PUBLIC_API void js::RestartDrainingJobQueue(JSContext* cx) {
   cx->internalJobQueue->uninterrupt();
 }
 
+JS_PUBLIC_API bool js::HasJobsPending(JSContext* cx) {
+  MOZ_ASSERT(cx->jobQueue);
+  return !cx->jobQueue->empty();
+}
+
 JS_PUBLIC_API void js::RunJobs(JSContext* cx) {
   MOZ_ASSERT(cx->jobQueue);
   MOZ_ASSERT(cx->isEvaluatingModule == 0);
@@ -857,6 +862,11 @@ bool InternalJobQueue::getHostDefinedData(
     JSContext* cx, JS::MutableHandle<JSObject*> data) const {
   data.set(nullptr);
   return true;
+}
+
+JS_PUBLIC_API void js::ResetMathRandomSeed(JSContext* cx) {
+  MOZ_ASSERT(cx->realm());
+  cx->realm()->resetRandomNumberGenerator();
 }
 
 bool InternalJobQueue::enqueuePromiseJob(JSContext* cx,

@@ -525,6 +525,8 @@ static const char* ArrayBufferViewKindName(ArrayBufferViewKind kind) {
   switch (kind) {
     case ArrayBufferViewKind::FixedLength:
       return "FixedLength";
+    case ArrayBufferViewKind::Immutable:
+      return "Immutable";
     case ArrayBufferViewKind::Resizable:
       return "Resizable";
   }

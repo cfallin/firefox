@@ -55,12 +55,14 @@
   MACRO_(AsyncGeneratorReturn, "AsyncGeneratorReturn")                         \
   MACRO_(AsyncGeneratorThrow, "AsyncGeneratorThrow")                           \
   MACRO2(at, "at")                                                             \
+  MACRO_(autoAllocateChunkSize, "autoAllocateChunkSize")                       \
   MACRO_(await, "await")                                                       \
   MACRO_(bound, "bound")                                                       \
   MACRO_(boundWithSpace_, "bound ")                                            \
   MACRO_(break_, "break")                                                      \
   MACRO_(breakdown, "breakdown")                                               \
   MACRO2(by, "by")                                                             \
+  MACRO_(byob, "byob")                                                         \
   MACRO_(byteLength, "byteLength")                                             \
   MACRO_(byteOffset, "byteOffset")                                             \
   MACRO_(bytes, "bytes")                                                       \
@@ -71,6 +73,7 @@
   MACRO_(callee, "callee")                                                     \
   MACRO_(callFunction, "callFunction")                                         \
   MACRO_(captureStackTrace, "captureStackTrace")                               \
+  MACRO_(cancel, "cancel")                                                     \
   MACRO_(case_, "case")                                                        \
   MACRO_(caseFirst, "caseFirst")                                               \
   MACRO_(catch_, "catch")                                                      \
@@ -78,6 +81,7 @@
   MACRO_(chunks, "chunks")                                                     \
   MACRO_(class_, "class")                                                      \
   MACRO_(cleanupSome, "cleanupSome")                                           \
+  MACRO_(close, "close")                                                       \
   MACRO_(collation, "collation")                                               \
   MACRO_(collections, "collections")                                           \
   MACRO_(column, "column")                                                     \
@@ -228,6 +232,7 @@
   MACRO_(hash_constructor_, "#constructor")                                    \
   MACRO_(hasIndices, "hasIndices")                                             \
   MACRO_(hasOwn, "hasOwn")                                                     \
+  MACRO_(highWaterMark, "highWaterMark")                                       \
   IF_EXPLICIT_RESOURCE_MANAGEMENT(MACRO_(hint, "hint"))                        \
   MACRO_(hour, "hour")                                                         \
   MACRO_(hour12, "hour12")                                                     \
@@ -338,6 +343,7 @@
   MACRO_(minutesDisplay, "minutesDisplay")                                     \
   MACRO_(minutesStyle, "minutesStyle")                                         \
   MACRO_(missingArguments, "missingArguments")                                 \
+  MACRO_(mode, "mode")                                                         \
   MACRO_(module, "module")                                                     \
   MACRO_(Module, "Module")                                                     \
   MACRO_(month, "month")                                                       \
@@ -407,8 +413,12 @@
   MACRO_(pause, "pause")                                                       \
   MACRO_(pending, "pending")                                                   \
   MACRO_(percentSign, "percentSign")                                           \
+  MACRO_(pipeTo, "pipeTo")                                                     \
   MACRO_(plainTime, "plainTime")                                               \
   MACRO_(plusSign, "plusSign")                                                 \
+  MACRO_(preventAbort, "preventAbort")                                         \
+  MACRO_(preventCancel, "preventCancel")                                       \
+  MACRO_(preventClose, "preventClose")                                         \
   MACRO_(preventExtensions, "preventExtensions")                               \
   MACRO_(private_, "private")                                                  \
   MACRO_(promise, "promise")                                                   \
@@ -417,6 +427,7 @@
   MACRO_(prototype, "prototype")                                               \
   MACRO_(proxy, "proxy")                                                       \
   MACRO_(public_, "public")                                                    \
+  MACRO_(pull, "pull")                                                         \
   MACRO_(quarter, "quarter")                                                   \
   MACRO_(range, "range")                                                       \
   MACRO_(raw, "raw")                                                           \
@@ -464,6 +475,7 @@
   MACRO_(setFromHex, "setFromHex")                                             \
   MACRO_(setPrototypeOf, "setPrototypeOf")                                     \
   MACRO_(shared, "shared")                                                     \
+  MACRO_(signal, "signal")                                                     \
   MACRO_(signDisplay, "signDisplay")                                           \
   MACRO_(size, "size")                                                         \
   MACRO_(sliceToImmutable, "sliceToImmutable")                                 \

@@ -1,0 +1,1 @@
+OptimizeSpreadCall, 1, 1, 7, JSVAL_TYPE_UNKNOWN, 8, STUBFIELD(Shape) , LASTUSED(5) , OP(GuardToObject) ID(0) OP(GuardClass) ID(0) GUARDCLASSKIND(UnmappedArguments) OP(GuardArgumentsObjectFlags) ID(0) BYTE(23) OP(GuardObjectHasSameRealm) ID(0) OP(GuardFuse) REALMFUSE(1) OP(ArrayFromArgumentsObjectResult) ID(0) OFFSET(0) OP(ReturnFromIC)  

@@ -52,11 +52,24 @@ class ListObject : public NativeObject {
   [[nodiscard]] inline bool append(JSContext* cx, Value value);
 
   /**
+   * Adds |value| and |size| elements to a list consisting of (value, size)
+   * pairs stored in successive elements.
+   */
+  [[nodiscard]] inline bool appendValueAndSize(JSContext* cx, HandleValue value,
+                                               double size);
+
+  /**
    * Remove and return the first element of the list.
    *
    * Precondition: This list is not empty.
    */
   inline JS::Value popFirst(JSContext* cx);
+
+  /**
+   * Remove the first two elements from a nonempty list of (value, size) pairs
+   * of elements.
+   */
+  inline void popFirstPair(JSContext* cx);
 
   /**
    * Remove and return the first element of the list.

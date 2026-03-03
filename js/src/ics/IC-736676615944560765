@@ -1,0 +1,1 @@
+BinaryArith, 2, 5, 7, JSVAL_TYPE_UNKNOWN, 0, , LASTUSED(2) LASTUSED(3) LASTUSED(4) LASTUSED(4) LASTUSED(5) , OP(GuardToBigInt) ID(0) OP(GuardToBigInt) ID(1) OP(BigIntToIntPtr) ID(0) ID(2) OP(BigIntToIntPtr) ID(1) ID(3) OP(BigIntPtrBitOr) ID(2) ID(3) ID(4) OP(IntPtrToBigIntResult) ID(4) OP(ReturnFromIC)  
