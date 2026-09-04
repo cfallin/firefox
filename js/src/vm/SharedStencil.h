@@ -619,6 +619,17 @@ class alignas(uint32_t) ImmutableScriptData final
                   "JIT expect Offset to be uint32_t");
     return offsetof(ImmutableScriptData, optArrayOffset_);
   }
+#ifdef ENABLE_JS_NIGHTMONKEY
+  static constexpr size_t offsetOfCodeLength() {
+    return offsetof(ImmutableScriptData, codeLength_);
+  }
+  static constexpr size_t offsetOfMainOffset() {
+    return offsetof(ImmutableScriptData, mainOffset);
+  }
+  static constexpr size_t offsetOfBodyScopeIndex() {
+    return offsetof(ImmutableScriptData, bodyScopeIndex);
+  }
+#endif
   static constexpr size_t offsetOfNfixed() {
     return offsetof(ImmutableScriptData, nfixed);
   }

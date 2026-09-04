@@ -43,7 +43,41 @@ namespace frontend {
 class TokenStreamAnyChars;
 }
 
+#ifdef ENABLE_JS_NIGHTMONKEY
+namespace night {
+// AOT-compiled regex matchers (Wasm functions compiled alongside the
+// scripts). Published by night_runtime_install_env; consulted by
+// irregexp::Execute before falling into the bytecode interpreter. The matcher
+// is called through a C function pointer whose value is a Wasm table index.
+struct NightRegexEntry {
+  const char16_t* pattern;
+  uint32_t patternLen;
+  uint32_t flags;
+  // Wasm indirect-table indices of the per-encoding matchers; 0 = none.
+  uint32_t latin1Idx;
+  uint32_t twobyteIdx;
+  uint32_t numRegisters;
+  uint32_t pairCount;
+};
+// The published table, backtrack scratch, and diagnostics counters live on the
+// runtime (js::night::NightRuntimeData, reached via cx->runtime()->nightData()):
+// written once by night_runtime_install_env, consulted by irregexp::TryNightRegexMatch.
+}  // namespace night
+#endif
+
 namespace irregexp {
+
+#ifdef ENABLE_JS_NIGHTMONKEY
+// Try the AOT-compiled Wasm matcher for this RegExpShared (single match).
+// Returns true and sets *out when the matcher decided the match; false to
+// fall back to the ordinary irregexp path. Called from RegExpShared::execute
+// (the funnel for Matcher/Searcher/Tester/BuiltinExec), so the whole
+// jit-choice/interpreter layering below is skipped on a hit.
+bool TryNightRegexMatch(JSContext* cx, MutableHandleRegExpShared re,
+                      Handle<JSLinearString*> input, size_t startIndex,
+                      VectorMatchPairs* matches, bool latin1,
+                      RegExpRunStatus* out);
+#endif
 
 Isolate* CreateIsolate(JSContext* cx);
 void TraceIsolate(JSTracer* trc, Isolate* isolate);

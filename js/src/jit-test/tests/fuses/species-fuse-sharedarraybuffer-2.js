@@ -1,3 +1,4 @@
+// |jit-test| skip-if: !this.SharedArrayBuffer
 // Test for shared array buffer species fuse with multiple realms.
 function test() {
   var g = newGlobal();

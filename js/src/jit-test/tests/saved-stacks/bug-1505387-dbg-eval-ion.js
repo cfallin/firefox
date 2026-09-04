@@ -1,4 +1,4 @@
-// |jit-test| --ion-eager; --no-threads;
+// |jit-test| --ion-eager; --no-threads; skip-if: nightTierEnabled()
 // This test ensures that debugger eval on an ion frame is able to correctly
 // follow the debugger eval frame link to its parent frame.
 

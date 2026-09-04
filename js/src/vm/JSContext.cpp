@@ -1548,6 +1548,17 @@ void JSContext::trace(JSTracer* trc) {
 #ifdef ENABLE_WASM_JSPI
   wasm().promiseIntegration.trace(trc);
 #endif
+#ifdef ENABLE_JS_NIGHTMONKEY
+  // The AOT value stack is the sole root region for compiled-Wasm frames (their
+  // args/this/locals/operands are boxed JS::Values living here, not in the GC
+  // heap). It must be traced on EVERY GC -- like the interpreter and JIT stacks
+  // -- so a minor (nursery) collection forwards the nursery pointers it holds.
+  // `JSContext::trace` runs from `traceRuntimeCommon` for both minor and major
+  // GC; an embedding extra-roots tracer would not (those are major-GC only).
+  if (nightStack().valid()) {
+    nightStack().trace(trc);
+  }
+#endif
 }
 
 JS::NativeStackLimit JSContext::stackLimitForJitCode(JS::StackKind kind) {

@@ -1,4 +1,5 @@
-// |jit-test| --enable-symbols-as-weakmap-keys
+// |jit-test| --enable-symbols-as-weakmap-keys; skip-if: nightTierEnabled()
+// (AOT string literals are not atoms; schedulezone("atoms") schedules the wrong zone.)
 
 // Test weak maps with symbols keys where the symbols are referenced in
 // different zones. Currently we require all participating zones plus the

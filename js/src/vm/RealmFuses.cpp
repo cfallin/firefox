@@ -10,6 +10,9 @@
 #include "builtin/MapObject.h"
 #include "builtin/Promise.h"
 #include "builtin/RegExp.h"
+#ifdef ENABLE_JS_NIGHTMONKEY
+#  include "builtin/String.h"
+#endif
 #include "builtin/WeakMapObject.h"
 #include "builtin/WeakSetObject.h"
 #include "js/experimental/TypedData.h"
@@ -643,3 +646,25 @@ bool js::OptimizeWeakSetPrototypeAddFuse::checkInvariant(JSContext* cx) {
   return ObjectHasDataPropertyFunction(proto, NameToId(cx->names().add),
                                        WeakSetObject::add);
 }
+
+#ifdef ENABLE_JS_NIGHTMONKEY
+bool js::OptimizeStringCharOpsFuse::checkInvariant(JSContext* cx) {
+  auto* proto = cx->global()->maybeGetPrototype<NativeObject>(JSProto_String);
+  if (!proto) {
+    // No proto, invariant still holds
+    return true;
+  }
+  if (!ObjectHasDataPropertyFunction(proto, NameToId(cx->names().charCodeAt),
+                                     js::str_charCodeAt) ||
+      !ObjectHasDataPropertyFunction(proto, NameToId(cx->names().charAt),
+                                     js::str_charAt)) {
+    return false;
+  }
+  auto* ctor = cx->global()->maybeGetConstructor<NativeObject>(JSProto_String);
+  if (!ctor) {
+    return true;
+  }
+  return ObjectHasDataPropertyFunction(ctor, NameToId(cx->names().fromCharCode),
+                                       js::str_fromCharCode);
+}
+#endif  // ENABLE_JS_NIGHTMONKEY

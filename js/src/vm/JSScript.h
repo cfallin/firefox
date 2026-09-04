@@ -1411,6 +1411,12 @@ class alignas(uintptr_t) PrivateScriptData final
     return sizeof(PrivateScriptData);
   }
 
+#ifdef ENABLE_JS_NIGHTMONKEY
+  static constexpr size_t offsetOfNGCThings() {
+    return offsetof(PrivateScriptData, ngcthings);
+  }
+#endif
+
   // Accessors for typed array spans.
   mozilla::Span<JS::GCCellPtr> gcthings() {
     Offset offset = offsetOfGCThings();
@@ -1576,6 +1582,14 @@ class BaseScript : public gc::TenuredCellWithNonGCPointer<uint8_t> {
   UniquePtr<Weval> weval_ = {};
 #endif
 
+#ifdef ENABLE_JS_NIGHTMONKEY
+  // Index into the AOT runtime's __indirect_function_table of this script's
+  // AOT-compiled Wasm body, or 0 when there is none (the script runs
+  // interpreted). The engine call path call_indirects through this with the
+  // §1 ABI. See js/src/night/aot-codegen-spec.md sections 1/4.1.
+  uint32_t nightFuncIndex_ = 0;
+#endif
+
   // End of fields.
 
   BaseScript(uint8_t* stubEntry, JSFunction* function,
@@ -1598,6 +1612,17 @@ class BaseScript : public gc::TenuredCellWithNonGCPointer<uint8_t> {
                                    uint32_t immutableFlags);
 
   bool isUsingInterpreterTrampoline(JSRuntime* rt) const;
+
+#ifdef ENABLE_JS_NIGHTMONKEY
+  uint32_t nightFuncIndex() const { return nightFuncIndex_; }
+  void setNightFuncIndex(uint32_t index) { nightFuncIndex_ = index; }
+  // Offset of `nightFuncIndex_`, baked by the driver's inline call-classify
+  // (translate.rs) and release-asserted at reactor startup. offsetof is not
+  // usable in a constant expression here, so the check is at runtime.
+  static constexpr size_t offsetOfNightFuncIndex() {
+    return offsetof(BaseScript, nightFuncIndex_);
+  }
+#endif
 
   // Canonical function for the script, if it has a function. For top-level
   // scripts this is nullptr.
@@ -1751,6 +1776,11 @@ class BaseScript : public gc::TenuredCellWithNonGCPointer<uint8_t> {
   static constexpr size_t offsetOfWarmUpData() {
     return offsetof(BaseScript, warmUpData_);
   }
+#ifdef ENABLE_JS_NIGHTMONKEY
+  static constexpr size_t offsetOfFunction() {
+    return offsetof(BaseScript, function_);
+  }
+#endif
 
 #if defined(DEBUG) || defined(JS_JITSPEW)
   void dumpStringContent(js::GenericPrinter& out) const;

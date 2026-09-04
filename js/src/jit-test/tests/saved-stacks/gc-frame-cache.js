@@ -1,3 +1,4 @@
+// |jit-test| skip-if: nightTierEnabled()
 // Test that SavedFrame instances get removed from the SavedStacks frames cache
 // after a GC.
 

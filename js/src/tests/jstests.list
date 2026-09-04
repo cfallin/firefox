@@ -43,6 +43,66 @@ skip-if(!this.hasOwnProperty("Intl")) script test262/built-ins/String/prototype/
 skip-if(!this.hasOwnProperty("Intl")) script test262/built-ins/String/prototype/toLowerCase/special_casing_conditional.js
 skip-if(!this.hasOwnProperty("Intl")) script test262/built-ins/String/prototype/toLocaleLowerCase/Final_Sigma_U180E.js
 skip-if(!this.hasOwnProperty("Intl")) script test262/built-ins/String/prototype/toLocaleLowerCase/special_casing_conditional.js
+skip-if(!this.hasOwnProperty("Intl")) script test262/built-ins/String/prototype/localeCompare/15.5.4.9_CE.js
+skip-if(!this.hasOwnProperty("Intl")) script test262/language/literals/regexp/u-case-mapping.js
+
+# Unicode property escapes need the Intl property tables.
+skip-if(!this.hasOwnProperty("Intl")) script test262/built-ins/RegExp/unicodeSets/generated/property-of-strings-escape-difference-character-property-escape.js
+skip-if(!this.hasOwnProperty("Intl")) script test262/built-ins/String/prototype/match/regexp-prototype-match-v-u-flag.js
+skip-if(!this.hasOwnProperty("Intl")) script test262/built-ins/String/prototype/matchAll/regexp-prototype-matchAll-v-u-flag.js
+skip-if(!this.hasOwnProperty("Intl")) script test262/built-ins/String/prototype/replace/regexp-prototype-replace-v-u-flag.js
+skip-if(!this.hasOwnProperty("Intl")) script test262/built-ins/String/prototype/search/regexp-prototype-search-v-flag.js
+skip-if(!this.hasOwnProperty("Intl")) script test262/built-ins/String/prototype/search/regexp-prototype-search-v-u-flag.js
+
+# The wasi shell's stack is too small for 32 nested function literals.
+skip-if(this.hasOwnProperty("getBuildConfiguration")&&getBuildConfiguration("wasi")) script test262/language/statements/function/S13.2.1_A1_T1.js
+
+# The NightMonkey tier has no frame introspection: fun.caller and
+# fun.arguments read null from a compiled frame.
+skip-if(this.hasOwnProperty("nightTierEnabled")&&nightTierEnabled()) script test262/language/arguments-object/10.6-13-a-2.js
+skip-if(this.hasOwnProperty("nightTierEnabled")&&nightTierEnabled()) script test262/language/arguments-object/10.6-13-a-3.js
+skip-if(this.hasOwnProperty("nightTierEnabled")&&nightTierEnabled()) script non262/Function/regress-222029-001.js
+skip-if(this.hasOwnProperty("nightTierEnabled")&&nightTierEnabled()) script non262/Function/regress-222029-002.js
+skip-if(this.hasOwnProperty("nightTierEnabled")&&nightTierEnabled()) script non262/Function/regress-85880.js
+skip-if(this.hasOwnProperty("nightTierEnabled")&&nightTierEnabled()) script test262/built-ins/Function/15.3.5.4_2-95gs.js
+skip-if(this.hasOwnProperty("nightTierEnabled")&&nightTierEnabled()) script test262/staging/sm/extensions/arguments-property-access-in-function.js
+skip-if(this.hasOwnProperty("nightTierEnabled")&&nightTierEnabled()) script test262/staging/sm/extensions/function-caller-skips-eval-frames.js
+skip-if(this.hasOwnProperty("nightTierEnabled")&&nightTierEnabled()) script test262/staging/sm/extensions/function-properties.js
+skip-if(this.hasOwnProperty("nightTierEnabled")&&nightTierEnabled()) script test262/staging/sm/regress/regress-577648-1.js
+skip-if(this.hasOwnProperty("nightTierEnabled")&&nightTierEnabled()) script test262/staging/sm/regress/regress-577648-2.js
+skip-if(this.hasOwnProperty("nightTierEnabled")&&nightTierEnabled()) script test262/staging/sm/regress/regress-586482-1.js
+skip-if(this.hasOwnProperty("nightTierEnabled")&&nightTierEnabled()) script test262/staging/sm/regress/regress-586482-2.js
+skip-if(this.hasOwnProperty("nightTierEnabled")&&nightTierEnabled()) script test262/staging/sm/regress/regress-586482-3.js
+skip-if(this.hasOwnProperty("nightTierEnabled")&&nightTierEnabled()) script test262/staging/sm/regress/regress-586482-4.js
+
+# Compiled frames carry no source positions: Error.stack, lineNumber,
+# columnNumber and fileName are empty for them.
+skip-if(this.hasOwnProperty("nightTierEnabled")&&nightTierEnabled()) script non262/async-functions/ErrorStack.js
+skip-if(this.hasOwnProperty("nightTierEnabled")&&nightTierEnabled()) script non262/Exceptions/errstack-001.js
+skip-if(this.hasOwnProperty("nightTierEnabled")&&nightTierEnabled()) script non262/Promise/any-stack.js
+skip-if(this.hasOwnProperty("nightTierEnabled")&&nightTierEnabled()) script non262/extensions/column-numbers.js
+skip-if(this.hasOwnProperty("nightTierEnabled")&&nightTierEnabled()) script non262/extensions/errorcolumnblame.js
+skip-if(this.hasOwnProperty("nightTierEnabled")&&nightTierEnabled()) script non262/extensions/regress-50447-1.js
+skip-if(this.hasOwnProperty("nightTierEnabled")&&nightTierEnabled()) script non262/extensions/toSource-infinite-recursion.js
+skip-if(this.hasOwnProperty("nightTierEnabled")&&nightTierEnabled()) script non262/regress/regress-167328.js
+skip-if(this.hasOwnProperty("nightTierEnabled")&&nightTierEnabled()) script non262/template-strings/debugLineNumber.js
+skip-if(this.hasOwnProperty("nightTierEnabled")&&nightTierEnabled()) script shell/script-file-name-utf8.js
+skip-if(this.hasOwnProperty("nightTierEnabled")&&nightTierEnabled()) script test262/staging/sm/extensions/regress-645160.js
+
+# Error messages from compiled code cannot name the offending expression
+# (no bytecode frame to decompile), so the engine falls back to the
+# value's source.
+skip-if(this.hasOwnProperty("nightTierEnabled")&&nightTierEnabled()) script non262/extensions/regress-353116.js
+skip-if(this.hasOwnProperty("nightTierEnabled")&&nightTierEnabled()) script non262/regress/regress-328664.js
+skip-if(this.hasOwnProperty("nightTierEnabled")&&nightTierEnabled()) script non262/regress/regress-372364.js
+skip-if(this.hasOwnProperty("nightTierEnabled")&&nightTierEnabled()) script non262/regress/regress-420919.js
+skip-if(this.hasOwnProperty("nightTierEnabled")&&nightTierEnabled()) script test262/staging/sm/object/toPrimitive.js
+
+# loadRelativeToScript resolves against the calling script's frame, which a
+# compiled caller does not expose.
+skip-if(this.hasOwnProperty("nightTierEnabled")&&nightTierEnabled()) script non262/extensions/clone-v1-typed-array.js
+skip-if(this.hasOwnProperty("nightTierEnabled")&&nightTierEnabled()) script non262/object/15.2.3.6-function-length.js
+skip-if(this.hasOwnProperty("nightTierEnabled")&&nightTierEnabled()) script non262/object/15.2.3.6-new-definition.js
 
 # Skip intl402 tests when Intl isn't available.
 skip-if(!this.hasOwnProperty("Intl")) include test262/intl402/jstests.list

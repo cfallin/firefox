@@ -1834,7 +1834,7 @@ static MOZ_ALWAYS_INLINE bool ToRelativeStringIndex(
  *
  * ES2024 draft rev 7d2644968bd56d54d2886c012d18698ff3f72c35
  */
-static bool str_charAt(JSContext* cx, unsigned argc, Value* vp) {
+bool js::str_charAt(JSContext* cx, unsigned argc, Value* vp) {
   AutoJSMethodProfilerEntry pseudoFrame(cx, "String.prototype", "charAt");
   CallArgs args = CallArgsFromVp(argc, vp);
 
@@ -4344,6 +4344,15 @@ static bool StringClassFinish(JSContext* cx, HandleObject ctor,
   if (!JS_DefineFunctions(cx, cx->global(), string_functions)) {
     return false;
   }
+
+#ifdef ENABLE_JS_NIGHTMONKEY
+  // Watchtower-watch the prototype and constructor so mutations of the
+  // char-op methods pop OptimizeStringCharOpsFuse.
+  if (!JSObject::setHasRealmFuseProperty(cx, proto) ||
+      !JSObject::setHasRealmFuseProperty(cx, ctor)) {
+    return false;
+  }
+#endif
 
   return true;
 }

@@ -1,4 +1,4 @@
-// |jit-test| skip-variant-if: --ion-eager, getBuildConfiguration("simulator")
+// |jit-test| skip-variant-if: --ion-eager, getBuildConfiguration("simulator"); skip-if: getBuildConfiguration("wasi")
 
 // Slow in simulators with --ion-eager.
 

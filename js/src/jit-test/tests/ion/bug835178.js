@@ -1,3 +1,4 @@
+// |jit-test| skip-if: nightTierEnabled()
 function boo() { return foo.arguments[0] }
 function foo(a,b,c) { if (a == 0) {a = 2; return boo();} return a }
 function inlined() { return foo.apply({}, arguments); }

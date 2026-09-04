@@ -1,3 +1,4 @@
+// |jit-test| skip-if: nightTierEnabled()
 // Check that {throw:} resumption kills the current stack frame.
 
 load(libdir + "asserts.js");

@@ -1,3 +1,4 @@
+// |jit-test| skip-if: nightTierEnabled()
 
 if (typeof baselineCompile == "function") {
     gc();

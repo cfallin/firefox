@@ -18,6 +18,9 @@ if CONFIG["MOZ_MEMORY"]:
 if CONFIG["MOZ_ICU4X"]:
     features += ["icu4x"]
 
+if CONFIG["ENABLE_JS_NIGHTMONKEY_INPROCESS"]:
+    features += ["night-compiler"]
+
 RustLibrary("jsrust", features)
 
 if CONFIG["JS_SHARED_LIBRARY"]:

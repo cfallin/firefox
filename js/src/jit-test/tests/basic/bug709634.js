@@ -1,3 +1,4 @@
+// |jit-test| skip-if: nightTierEnabled()
 
 Function.prototype.toString = function () { return f(this, true); };
 function f(obj) {

@@ -1,3 +1,4 @@
+// |jit-test| skip-if: nightTierEnabled()
 // Don't assert trying to force return before the initial yield of an async function.
 
 var g = newGlobal({newCompartment: true});

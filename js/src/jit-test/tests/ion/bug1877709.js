@@ -1,3 +1,4 @@
+// |jit-test| skip-if: !this.SharedArrayBuffer
 function testMathyFunction (f, inputs) {
   var results = [];
     for (var j = 0; j < inputs.length; ++j)

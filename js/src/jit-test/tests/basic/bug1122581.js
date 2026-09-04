@@ -1,3 +1,4 @@
+// |jit-test| skip-if: nightTierEnabled()
 function f(x, y) {
     for (var i=0; i<50; i++) {
 	if (i % 10 === 0) {

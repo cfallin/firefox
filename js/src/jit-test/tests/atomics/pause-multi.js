@@ -1,4 +1,4 @@
-// |jit-test| --enable-atomics-pause; skip-if: !Atomics.pause || helperThreadCount() === 0 || getBuildConfiguration("arm64-simulator") === true
+// |jit-test| --enable-atomics-pause; skip-if: !this.Atomics || !Atomics.pause || helperThreadCount() === 0 || getBuildConfiguration("arm64-simulator") === true
 
 function startWorker(worker) {
   evalInWorker(`

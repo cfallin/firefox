@@ -17,6 +17,12 @@ extern crate encoding_c_mem;
 extern crate mozglue_static;
 extern crate unicode_bidi_ffi;
 
+#[cfg(feature = "night-compiler")]
+extern crate night_compiler;
+
+#[cfg(feature = "night-compiler")]
+extern crate night_snapshot;
+
 #[cfg(feature = "gluesmith")]
 extern crate gluesmith;
 

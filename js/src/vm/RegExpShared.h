@@ -121,6 +121,12 @@ class RegExpShared
   uint32_t maxRegisters_ = 0;
   uint32_t ticks_ = 0;
 
+#ifdef ENABLE_JS_NIGHTMONKEY
+  // Cached AOT wasm-matcher lookup: UINT32_MAX unresolved, 0 no matcher,
+  // else index+1 into the runtime nightData().regexTable.
+  uint32_t nightRegexEntryPlus1_ = UINT32_MAX;
+#endif
+
   // With duplicate named capture groups, it's possible that the number of
   // distinct named groups is less than the total number of named captures.
   // If they are equal, we used the namedCaptureIndices_ array directly to
@@ -215,6 +221,11 @@ class RegExpShared
   void updateMaxRegisters(uint32_t numRegisters) {
     maxRegisters_ = std::max(maxRegisters_, numRegisters);
   }
+
+#ifdef ENABLE_JS_NIGHTMONKEY
+  uint32_t nightRegexEntryPlus1() const { return nightRegexEntryPlus1_; }
+  void setNightRegexEntryPlus1(uint32_t v) { nightRegexEntryPlus1_ = v; }
+#endif
 
   uint32_t numNamedCaptures() const { return numNamedCaptures_; }
   uint32_t numDistinctNamedCaptures() const {

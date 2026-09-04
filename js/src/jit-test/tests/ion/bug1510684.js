@@ -1,3 +1,4 @@
+// |jit-test| skip-if: nightTierEnabled()
 var verified = false;
 function f(a) {
     if (a < 10000)

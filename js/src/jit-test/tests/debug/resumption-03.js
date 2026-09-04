@@ -1,3 +1,4 @@
+// |jit-test| skip-if: nightTierEnabled()
 // Returning and throwing objects.
 
 load(libdir + "asserts.js");

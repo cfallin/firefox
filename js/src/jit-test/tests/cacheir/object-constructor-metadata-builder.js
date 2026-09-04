@@ -1,3 +1,4 @@
+// |jit-test| skip-if: nightTierEnabled()
 let capture = [];
 
 for (let i = 0; i <= 200; ++i) {

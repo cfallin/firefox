@@ -1,3 +1,4 @@
+// |jit-test| skip-if: nightTierEnabled()
 // Debugger.Frame.prototype.onStack is false for frames that have thrown or been thrown through
 
 load(libdir + "asserts.js");

@@ -1,3 +1,4 @@
+// |jit-test| skip-if: !this.SharedArrayBuffer
 // Ensure we create Ion ICs to cover IonCacheIRCompiler code paths.
 setJitCompilerOption("ion.forceinlineCaches", 1);
 

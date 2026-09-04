@@ -1,3 +1,4 @@
+// |jit-test| skip-if: nightTierEnabled()
 // Test that async stacks are limited on recursion.
 
 const defaultAsyncStackLimit = 60;

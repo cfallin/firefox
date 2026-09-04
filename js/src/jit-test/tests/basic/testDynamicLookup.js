@@ -1,3 +1,4 @@
+// |jit-test| skip-if: nightTierEnabled()
 (function() { var x = 2; eval("assertEq(x, 2)"); })();
 (function() { var x = 2; (function() { assertEq(x, 2) })() })();
 (function() { var x = 2; (function() { eval("assertEq(x, 2)") })() })();

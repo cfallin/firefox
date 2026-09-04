@@ -1344,6 +1344,12 @@ void JSObject::swap(JSContext* cx, HandleObject a, HandleObject b,
     }
   }
 
+#ifdef ENABLE_JS_NIGHTMONKEY
+  // Swapped guts may no longer conform to a stamped likely class.
+  a->clearNightLikelyClass(js::NightBumpSite::ObjectSwap);
+  b->clearNightLikelyClass(js::NightBumpSite::ObjectSwap);
+#endif
+
   // Restore original unique IDs.
   if ((aid || bid) && (na || nb)) {
     if ((aid && !gc::SetOrUpdateUniqueId(cx, a, aid)) ||

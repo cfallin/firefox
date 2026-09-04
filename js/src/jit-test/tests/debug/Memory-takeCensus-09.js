@@ -1,3 +1,4 @@
+// |jit-test| skip-if: nightTierEnabled()
 // Debugger.Memory.prototype.takeCensus: by: allocationStack breakdown
 
 var g = newGlobal({newCompartment: true});

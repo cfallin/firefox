@@ -2373,6 +2373,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "fxhash"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c31b6d751ae2c7f11320402d34e41349dd1016f8d5d45e48c4312bc8625af50c"
+dependencies = [
+ "byteorder",
+]
+
+[[package]]
 name = "gecko-fuzz-targets"
 version = "0.1.0"
 dependencies = [
@@ -2955,6 +2964,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "hashbrown"
+version = "0.17.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ed5909b6e89a2db4456e54cd5f673791d7eca6732202bbf2a9cc504fe2f9b84a"
+
+[[package]]
 name = "hashlink"
 version = "0.10.999"
 dependencies = [
@@ -3422,12 +3437,12 @@ dependencies = [
 
 [[package]]
 name = "indexmap"
-version = "2.11.4"
+version = "2.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4b0f83760fb341a774ed326568e19f5a863af4a952def8c39f9ab92fd95b88e5"
+checksum = "d466e9454f08e4a911e14806c24e16fba1b4c121d1ea474396f396069cf949d9"
 dependencies = [
  "equivalent",
- "hashbrown 0.16.0",
+ "hashbrown 0.17.1",
  "serde",
  "serde_core",
 ]
@@ -3623,6 +3638,8 @@ dependencies = [
  "gluesmith",
  "icu_capi",
  "mozglue-static",
+ "night-compiler",
+ "night-snapshot",
  "unicode-bidi-ffi",
 ]
 
@@ -3771,6 +3788,12 @@ name = "leb128"
 version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "884e2677b40cc8c339eaefcb701c32ef1fd2493d71118dc0ca4b6a736c93bd67"
+
+[[package]]
+name = "leb128fmt"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "09edd9e8b54e49e587e4f6295a7d29c3ea94d469cb40ab8ca70b288248a81db2"
 
 [[package]]
 name = "libc"
@@ -4972,6 +4995,27 @@ name = "new_debug_unreachable"
 version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e4a24736216ec316047a1fc4252e27dabb04218aa4a3f37c6e7ddbf1f9782b54"
+
+[[package]]
+name = "night-compiler"
+version = "0.1.0"
+dependencies = [
+ "log",
+ "mozilla-central-workspace-hack",
+ "rustc-hash 2.1.1",
+ "waffle",
+ "wasm-encoder 0.248.0",
+ "wasmparser 0.248.0",
+]
+
+[[package]]
+name = "night-snapshot"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "night-compiler",
+ "rustc-hash 2.1.1",
+]
 
 [[package]]
 name = "nix"
@@ -7694,6 +7738,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"
 
 [[package]]
+name = "waffle"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "de9d7881318c4957534037f7595778f89bc8aded2d853664358050bca3fb3882"
+dependencies = [
+ "anyhow",
+ "fxhash",
+ "log",
+ "smallvec",
+ "wasm-encoder 0.248.0",
+ "wasmparser 0.248.0",
+]
+
+[[package]]
 name = "walkdir"
 version = "2.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7768,7 +7826,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "29cbbd772edcb8e7d524a82ee8cef8dd046fc14033796a754c3ad246d019fa54"
 dependencies = [
  "leb128",
- "wasmparser",
+ "wasmparser 0.219.1",
+]
+
+[[package]]
+name = "wasm-encoder"
+version = "0.248.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ac92cf547bc18d27ecc521015c08c353b4f18b84ab388bb6d1b6b682c620d9b6"
+dependencies = [
+ "leb128fmt",
+ "wasmparser 0.248.0",
 ]
 
 [[package]]
@@ -7782,7 +7850,7 @@ dependencies = [
  "flagset",
  "indexmap",
  "leb128",
- "wasm-encoder",
+ "wasm-encoder 0.219.1",
 ]
 
 [[package]]
@@ -7796,6 +7864,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "wasmparser"
+version = "0.248.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aa4439c5eee9df71ee0c6efb37f63b1fcb1fec38f85f5142c54e7ed05d33091a"
+dependencies = [
+ "bitflags 2.9.0",
+ "indexmap",
+ "semver",
+]
+
+[[package]]
 name = "wast"
 version = "219.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7805,7 +7884,7 @@ dependencies = [
  "leb128",
  "memchr",
  "unicode-width 0.1.999",
- "wasm-encoder",
+ "wasm-encoder 0.219.1",
 ]
 
 [[package]]

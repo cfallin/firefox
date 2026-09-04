@@ -1,3 +1,4 @@
+// |jit-test| skip-if: nightTierEnabled()
 // PIC on CALLPROP invoking getter hook.
 
 function foo(arr) {

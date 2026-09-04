@@ -24,6 +24,11 @@
 #include "vm/PlainObject.h"         // js::PlainObject
 #include "vm/TypedArrayObject.h"
 #include "vm/Watchtower.h"
+
+#ifdef ENABLE_JS_NIGHTMONKEY
+#  include "night/runtime/Night.h"  // js::night::NightAddPropCheck
+#  include "vm/GlobalObject.h"
+#endif
 #include "gc/Nursery-inl.h"
 #include "vm/JSObject-inl.h"
 #include "vm/Shape-inl.h"
@@ -1475,6 +1480,9 @@ bool js::AddSlotAndCallAddPropHook(JSContext* cx, Handle<NativeObject*> obj,
     return false;
   }
   obj->initSlot(slot, v);
+#ifdef ENABLE_JS_NIGHTMONKEY
+  night::NightAddPropCheck(obj, id, slot, obj->numFixedSlots());
+#endif
 
   if (MOZ_UNLIKELY(hasUnpreservedWrapper)) {
     MaybePreserveDOMWrapper(cx, obj);
@@ -1589,6 +1597,11 @@ bool js::NativeDefineProperty(JSContext* cx, Handle<NativeObject*> obj,
                               HandleId id, Handle<PropertyDescriptor> desc_,
                               ObjectOpResult& result) {
   desc_.assertValid();
+#ifdef ENABLE_JS_NIGHTMONKEY
+  if (MOZ_UNLIKELY(obj->is<GlobalObject>())) {
+    night::NightGlobalKeyBlow(id);
+  }
+#endif
 
   // Section numbers and step numbers below refer to ES2025, draft rev
   // ac21460fedf4b926520b06c9820bdbebad596a8b.
@@ -2446,6 +2459,11 @@ static bool NativeSetExistingDataProperty(JSContext* cx,
 
   if (prop.isDataProperty()) {
     // The common path. Standard data property.
+#ifdef ENABLE_JS_NIGHTMONKEY
+    if (MOZ_UNLIKELY(obj->is<GlobalObject>())) {
+      night::NightGlobalDataStore(id, v.asRawBits());
+    }
+#endif
     obj->setSlot(prop.slot(), v);
     return result.succeed();
   }
@@ -2865,6 +2883,11 @@ bool js::NativeDeleteProperty(JSContext* cx, Handle<NativeObject*> obj,
                               result)) {
     return false;
   }
+#ifdef ENABLE_JS_NIGHTMONKEY
+  if (MOZ_UNLIKELY(obj->is<GlobalObject>())) {
+    night::NightGlobalKeyBlow(id);
+  }
+#endif
   if (!result) {
     return true;
   }

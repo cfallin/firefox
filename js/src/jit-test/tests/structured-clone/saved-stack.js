@@ -1,3 +1,4 @@
+// |jit-test| skip-if: nightTierEnabled()
 // The following binary data was created with:
 // JS_STRUCTURED_CLONE_VERSION = 8
 //

@@ -1,4 +1,4 @@
-// |jit-test| skip-if: getBuildConfiguration("android")
+// |jit-test| skip-if: getBuildConfiguration("android"); skip-if: getBuildConfiguration("wasi")
 // Disabled on Android because of differing recursion limits (bug 2000192)
 
 let REPEAT_COUNT = 300;

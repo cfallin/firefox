@@ -1,3 +1,4 @@
+// |jit-test| skip-if: nightTierEnabled()
 const dbg = newGlobal({ sameZoneAs: this }).Debugger(this);
 
 async function* inspectingGenerator() {

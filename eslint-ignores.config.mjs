@@ -189,6 +189,7 @@ export default [
   "js/public/",
   "js/src/devtools/",
   "js/src/jit-test/",
+  "js/src/night/tests/",
   "js/src/tests/",
   "js/src/Y.js",
 

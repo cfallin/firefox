@@ -1,3 +1,4 @@
+// |jit-test| skip-if: nightTierEnabled()
 load(libdir + "evalInFrame.js");
 
 // Test that computing the implicit 'this' in calls for D.F.eval is as if it

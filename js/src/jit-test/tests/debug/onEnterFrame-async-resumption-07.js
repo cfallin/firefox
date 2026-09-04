@@ -1,3 +1,4 @@
+// |jit-test| skip-if: nightTierEnabled()
 // A Debugger can't force-return from the first onEnterFrame for an async generator.
 
 ignoreUnhandledRejections();

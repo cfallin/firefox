@@ -1,4 +1,4 @@
-// |jit-test| --no-blinterp
+// |jit-test| --no-blinterp; skip-if: nightTierEnabled()
 // Disable Baseline Interpreter and JITs because we only read information about
 // C++ Interpreter profiling frames.
 

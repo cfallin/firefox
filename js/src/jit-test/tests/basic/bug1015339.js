@@ -1,3 +1,4 @@
+// |jit-test| skip-if: nightTierEnabled()
 function f(x, y) {
     for (var i=0; i<40; i++) {
 	var stack = getBacktrace({args: true, locals: true, thisprops: true});

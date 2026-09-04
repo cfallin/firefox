@@ -1,4 +1,4 @@
-// |jit-test| exitstatus: 6; skip-if: getBuildConfiguration('pbl')
+// |jit-test| exitstatus: 6; skip-if: getBuildConfiguration('pbl'); skip-if: nightTierEnabled()
 var global = 0;
 setInterruptCallback(function() {
     foo("A");

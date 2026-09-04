@@ -1,3 +1,4 @@
+// |jit-test| skip-if: nightTierEnabled()
 // Test that you can't call the SavedFrame constructor and can only use
 // SavedFrame's getters on SavedFrame instances.
 

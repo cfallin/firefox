@@ -134,7 +134,7 @@ class Nursery {
   // now succeed.
   [[nodiscard]] JS::GCReason handleAllocationFailure();
 
-  static size_t nurseryCellHeaderSize() {
+  static constexpr size_t nurseryCellHeaderSize() {
     return sizeof(gc::NurseryCellHeader);
   }
 

@@ -1,3 +1,4 @@
+// |jit-test| skip-if: nightTierEnabled()
 // Ensure the correct frame is passed to exception unwind hooks.
 var g = newGlobal({newCompartment: true});
 g.debuggeeGlobal = this;

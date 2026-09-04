@@ -1,4 +1,4 @@
-// |jit-test| --fast-warmup; --no-threads; exitstatus: 6
+// |jit-test| --fast-warmup; --no-threads; exitstatus: 6; skip-if: getBuildConfiguration("wasi")
 timeout(0.05);
 function f() {
     var b = "".match();

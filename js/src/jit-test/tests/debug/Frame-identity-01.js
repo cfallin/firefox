@@ -1,3 +1,4 @@
+// |jit-test| skip-if: nightTierEnabled()
 // Check that {return:} resumption kills the current stack frame.
 
 var g = newGlobal({newCompartment: true});

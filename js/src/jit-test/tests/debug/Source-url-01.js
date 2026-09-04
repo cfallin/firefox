@@ -1,3 +1,4 @@
+// |jit-test| skip-if: nightTierEnabled()
 // Source.prototype.url returns a synthesized URL for eval code.
 
 var g = newGlobal({newCompartment: true});

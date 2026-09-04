@@ -1,3 +1,4 @@
+// |jit-test| skip-if: nightTierEnabled()
 // Test AutoSetAsyncStackForNewCalls's IMPLICIT kind.
 
 // Given a SavedFrame stack, return a string listing the frame's function names

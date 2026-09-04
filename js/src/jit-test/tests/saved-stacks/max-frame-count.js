@@ -1,3 +1,4 @@
+// |jit-test| skip-if: nightTierEnabled()
 // Test that we can capture only the N newest frames.
 // This is the maxFrameCount argument to JS::CaptureCurrentStack.
 

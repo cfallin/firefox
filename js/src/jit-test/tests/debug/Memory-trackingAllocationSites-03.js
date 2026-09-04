@@ -1,3 +1,4 @@
+// |jit-test| skip-if: nightTierEnabled()
 // Test that multiple Debuggers behave reasonably.
 
 load(libdir + "asserts.js");

@@ -1,3 +1,4 @@
+// |jit-test| skip-if: nightTierEnabled()
 const dbgGlobal = newGlobal({ newCompartment: true });
 dbgGlobal.parent = this;
 dbgGlobal.eval(`

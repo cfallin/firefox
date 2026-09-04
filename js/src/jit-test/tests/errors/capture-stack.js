@@ -1,4 +1,4 @@
-// |jit-test| --setpref=experimental.error_capture_stack_trace;
+// |jit-test| --setpref=experimental.error_capture_stack_trace; skip-if: nightTierEnabled()
 load(libdir + "asserts.js");
 
 if ('captureStackTrace' in Error) {

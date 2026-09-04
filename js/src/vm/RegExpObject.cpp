@@ -724,6 +724,20 @@ RegExpRunStatus RegExpShared::execute(JSContext* cx,
     return RegExpRunStatus::Error;
   }
 
+#ifdef ENABLE_JS_NIGHTMONKEY
+  // AOT wasm matcher: decide the match here, skipping the irregexp
+  // jit-choice + interpreter layering below. Falls through on RETRY
+  // (backtrack budget / stack limit) or when no matcher covers this
+  // pattern/encoding.
+  {
+    RegExpRunStatus nightStatus;
+    if (irregexp::TryNightRegexMatch(cx, re, input, start, matches,
+                                   input->hasLatin1Chars(), &nightStatus)) {
+      return nightStatus;
+    }
+  }
+#endif
+
   uint32_t interruptRetries = 0;
   const uint32_t maxInterruptRetries = 4;
   do {

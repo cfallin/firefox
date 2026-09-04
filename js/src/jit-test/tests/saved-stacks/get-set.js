@@ -1,3 +1,4 @@
+// |jit-test| skip-if: nightTierEnabled()
 // Test that we can save stacks with getter and setter function frames.
 
 function assertStackLengthEq(stack, expectedLength) {

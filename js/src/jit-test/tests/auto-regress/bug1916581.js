@@ -1,3 +1,4 @@
+// |jit-test| skip-if: !this.Atomics
 function blackhole() {
   with ({});
 }

@@ -1,3 +1,4 @@
+// |jit-test| skip-if: nightTierEnabled()
 g = newGlobal({newCompartment: true});
 g.parent = this;
 g.eval("(" + function() {

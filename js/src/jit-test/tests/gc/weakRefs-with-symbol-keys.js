@@ -1,4 +1,5 @@
-// |jit-test| --enable-symbols-as-weakmap-keys
+// |jit-test| --enable-symbols-as-weakmap-keys; skip-if: nightTierEnabled()
+// (AOT string literals are not atoms; schedulezone("atoms") schedules the wrong zone.)
 
 // https://tc39.es/ecma262/#sec-addtokeptobjects
 // When the abstract operation AddToKeptObjects is called with a target object

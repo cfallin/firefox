@@ -80,6 +80,10 @@
 #  include "vtune/VTuneWrapper.h"
 #endif
 
+#ifdef ENABLE_JS_NIGHTMONKEY
+#  include "night/runtime/Night.h"  // js::night::NightBlowDynamicCodeFuse
+#endif
+
 #include "gc/Marking-inl.h"
 #include "vm/BytecodeIterator-inl.h"
 #include "vm/BytecodeLocation-inl.h"
@@ -1677,6 +1681,14 @@ bool ScriptSource::assignSource(FrontendContext* fc,
                                 SourceText<Unit>& srcBuf) {
   MOZ_ASSERT(data.is<Missing>(),
              "source assignment should only occur on fresh ScriptSources");
+
+#ifdef ENABLE_JS_NIGHTMONKEY
+  // Source text is entering the frontend, and this is the one place every
+  // compile-from-source passes through (delazification reuses an existing
+  // ScriptSource and does not come here). Blow before anything can run, and
+  // before the option-dependent early returns below.
+  js::night::NightBlowDynamicCodeFuse();
+#endif
 
   mutedErrors_ = options.mutedErrors();
   delazificationMode_ = options.eagerDelazificationStrategy();

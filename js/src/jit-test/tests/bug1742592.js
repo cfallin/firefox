@@ -1,3 +1,4 @@
+// |jit-test| skip-if: typeof Intl === 'undefined'
 function a(b, c) {
   b.formatToParts(c)
 }

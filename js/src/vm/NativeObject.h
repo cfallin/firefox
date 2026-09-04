@@ -361,18 +361,18 @@ class ObjectElements {
 
   bool isSharedMemory() const { return flags & SHARED_MEMORY; }
 
-  static int offsetOfFlags() {
+  static constexpr int offsetOfFlags() {
     return int(offsetof(ObjectElements, flags)) - int(sizeof(ObjectElements));
   }
-  static int offsetOfInitializedLength() {
+  static constexpr int offsetOfInitializedLength() {
     return int(offsetof(ObjectElements, initializedLength)) -
            int(sizeof(ObjectElements));
   }
-  static int offsetOfCapacity() {
+  static constexpr int offsetOfCapacity() {
     return int(offsetof(ObjectElements, capacity)) -
            int(sizeof(ObjectElements));
   }
-  static int offsetOfLength() {
+  static constexpr int offsetOfLength() {
     return int(offsetof(ObjectElements, length)) - int(sizeof(ObjectElements));
   }
 
@@ -1170,6 +1170,12 @@ class NativeObject : public JSObject {
     MOZ_ASSERT(AtomIsMarked(zoneFromAnyThread(), v));
     MOZ_ASSERT_IF(v.isMagic() && v.whyMagic() == JS_ELEMENTS_HOLE,
                   !denseElementsArePacked());
+#ifdef ENABLE_JS_NIGHTMONKEY
+    // The shallow-conformance choke point all setSlot/initSlot flavors
+    // funnel through: number stores keep the flags (the claim is
+    // numberness); any other store clears them.
+    nightStoreCheckOrClear(v, js::NightBumpSite::StoredValue);
+#endif
   }
 
   MOZ_ALWAYS_INLINE void setSlot(uint32_t slot, const Value& value) {
@@ -1186,6 +1192,9 @@ class NativeObject : public JSObject {
   }
 
   MOZ_ALWAYS_INLINE void initSlotUnchecked(uint32_t slot, const Value& value) {
+#ifdef ENABLE_JS_NIGHTMONKEY
+    nightStoreCheckOrClear(value, js::NightBumpSite::InitSlotUnchecked);
+#endif
     getSlotAddressUnchecked(slot)->init(this, HeapSlot::Slot, slot, value);
   }
 
@@ -1743,7 +1752,9 @@ class NativeObject : public JSObject {
   }
 
   /* JIT Accessors */
-  static size_t offsetOfElements() { return offsetof(NativeObject, elements_); }
+  static constexpr size_t offsetOfElements() {
+    return offsetof(NativeObject, elements_);
+  }
   static size_t offsetOfFixedElements() {
     return sizeof(NativeObject) + sizeof(ObjectElements);
   }
@@ -1763,7 +1774,9 @@ class NativeObject : public JSObject {
     MOZ_ASSERT(offset % sizeof(Value) == 0);
     return offset / sizeof(Value);
   }
-  static size_t offsetOfSlots() { return offsetof(NativeObject, slots_); }
+  static constexpr size_t offsetOfSlots() {
+    return offsetof(NativeObject, slots_);
+  }
 };
 
 inline void NativeObject::privatePreWriteBarrier(HeapSlot* pprivate) {

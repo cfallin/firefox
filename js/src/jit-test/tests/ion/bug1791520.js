@@ -1,3 +1,4 @@
+// |jit-test| skip-if: !this.Atomics
 function testAtomicsAdd() {
   var x;
   for (var i = 0; i < 100; ++i) {

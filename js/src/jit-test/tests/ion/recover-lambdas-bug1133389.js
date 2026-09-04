@@ -1,3 +1,4 @@
+// |jit-test| skip-if: nightTierEnabled()
 var o = {}
 Object.defineProperty(o, "p", {
     get: function() {

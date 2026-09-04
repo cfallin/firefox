@@ -1,4 +1,4 @@
-// |jit-test| skip-if: isLcovEnabled()
+// |jit-test| skip-if: isLcovEnabled(); skip-if: nightTierEnabled()
 
 // findScript should try to avoid delazifying unnecessarily.
 

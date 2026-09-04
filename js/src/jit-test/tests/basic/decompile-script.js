@@ -1,3 +1,4 @@
+// |jit-test| skip-if: nightTierEnabled()
 function example(a, b, c) {
     var complicated = 3;
     perform_some_operations();

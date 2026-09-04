@@ -1,3 +1,4 @@
+// |jit-test| skip-if: typeof Intl === 'undefined'
 // Create a two-byte string which has only Latin-1 characters.
 var str = newString("12345678901234567890", {twoByte: true});
 

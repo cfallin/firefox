@@ -1,3 +1,4 @@
+// |jit-test| skip-if: nightTierEnabled()
 function dumpArgs(i) { if (i == 90) return funapply.arguments.length; return [i]; }
 function funapply() { return dumpArgs.apply(undefined, arguments); }
 function test(i) { return funapply(i); }

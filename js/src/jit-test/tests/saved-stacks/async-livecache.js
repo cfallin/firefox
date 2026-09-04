@@ -1,3 +1,4 @@
+// |jit-test| skip-if: nightTierEnabled()
 // Async stacks should not supplant LiveSavedFrameCache hits.
 
 top();

@@ -61,6 +61,11 @@
 #include "vm/Stack.h"
 #include "wasm/WasmTypeDecls.h"
 
+#ifdef ENABLE_JS_NIGHTMONKEY
+#  include "night/runtime/NightRuntimeData.h"  // js::night::NightRuntimeData
+#  include "night/runtime/NightStack.h"        // js::nightrt::NightStack
+#endif
+
 struct JSAtomState;
 struct JSClass;
 struct JSErrorInterceptor;
@@ -317,8 +322,21 @@ struct JSRuntime {
   js::MainThreadData<js::PortableBaselineStack> portableBaselineStack_;
 #endif
 
+#ifdef ENABLE_JS_NIGHTMONKEY
+  /* The AOT value stack: sole GC root for AOT-compiled code
+   * (js/src/night/runtime). */
+  js::MainThreadData<js::nightrt::NightStack> nightStack_;
+  /* Per-runtime caches for AOT-synthesized objects (anonymous-slot keys and
+   * memoized N-slot shapes). */
+  js::MainThreadData<js::night::NightRuntimeData> nightData_;
+#endif
+
  public:
   js::InterpreterStack& interpreterStack() { return interpreterStack_.ref(); }
+#ifdef ENABLE_JS_NIGHTMONKEY
+  js::nightrt::NightStack& nightStack() { return nightStack_.ref(); }
+  js::night::NightRuntimeData& nightData() { return nightData_.ref(); }
+#endif
 #ifdef ENABLE_PORTABLE_BASELINE_INTERP
   js::PortableBaselineStack& portableBaselineStack() {
     return portableBaselineStack_.ref();

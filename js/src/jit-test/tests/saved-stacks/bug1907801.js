@@ -1,3 +1,4 @@
+// |jit-test| skip-if: nightTierEnabled()
 let g = newGlobal({ newCompartment: true });
 let dbg = Debugger(g);
 

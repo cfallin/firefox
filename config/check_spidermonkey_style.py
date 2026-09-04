@@ -48,6 +48,10 @@ ignored_js_src_dirs = [
     "js/src/devtools/",  # auxiliary stuff
     "js/src/editline/",  # imported code
     "js/src/gdb/",  # auxiliary stuff
+    "js/src/night/nightmonkey/",  # snapshot transform tool (own crate)
+    "js/src/night/snapshot/",  # own crate (build outputs)
+    "js/src/night/snapshot-dump/",  # host dump tool (own crate)
+    "js/src/night/wasm-jit-runner/",  # vendored tool (own crate)
     "js/src/vtune/",  # imported code
     "js/src/zydis/",  # imported code
     "js/src/xsum/",  # imported code
@@ -104,6 +108,7 @@ included_inclnames_to_ignore = set(
         "unicode/uniset.h",  # ICU
         "unicode/unistr.h",  # ICU
         "unicode/utypes.h",  # ICU
+        "night/snapshot/night-snapshot.h",  # lives in an ignored crate dir
         "vtune/VTuneWrapper.h",  # VTune
         "wasm/WasmBuiltinModuleGenerated.h",  # generated in $OBJDIR"
         "zydis/ZydisAPI.h",  # Zydis

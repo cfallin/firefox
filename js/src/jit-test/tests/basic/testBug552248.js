@@ -1,3 +1,4 @@
+// |jit-test| skip-if: nightTierEnabled()
 load(libdir + "evalInFrame.js");
 
 var a = new Array();

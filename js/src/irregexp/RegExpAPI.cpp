@@ -33,11 +33,15 @@
 #include "js/friend/ErrorMessages.h"  // JSMSG_*
 #include "js/friend/StackLimits.h"    // js::ReportOverRecursed
 #include "util/StringBuilder.h"
+#ifdef ENABLE_JS_NIGHTMONKEY
+#  include "night/runtime/NightRuntimeData.h"  // js::night::NightRuntimeData (regex table cache)
+#endif
 #include "vm/MatchPairs.h"
 #include "vm/PlainObject.h"
 #include "vm/RegExpShared.h"
 
 namespace js {
+
 namespace irregexp {
 
 using mozilla::AssertedCast;
@@ -916,9 +920,21 @@ RegExpRunStatus Interpret(JSContext* cx, MutableHandleRegExpShared re,
   return status;
 }
 
+#ifdef ENABLE_JS_NIGHTMONKEY
+// TryNightRegexMatch (js/src/night/runtime/NightRegExp.cpp) reads an AOT
+// matcher's status word without including the imported V8 header; keep its
+// locally-named constants pinned to the values they mirror.
+static_assert(js::night::kRegexMatcherSuccess ==
+              v8::internal::RegExp::kInternalRegExpSuccess);
+static_assert(js::night::kRegexMatcherFailure ==
+              v8::internal::RegExp::kInternalRegExpFailure);
+#endif  // ENABLE_JS_NIGHTMONKEY
+
 RegExpRunStatus Execute(JSContext* cx, MutableHandleRegExpShared re,
                         Handle<JSLinearString*> input, size_t startIndex,
                         VectorMatchPairs* matches) {
+  // The AOT-matcher divert happens in RegExpShared::execute (the only caller);
+  // reaching here means no matcher, or the matcher returned RETRY.
   bool latin1 = input->hasLatin1Chars();
   jit::JitCode* jitCode = re->getJitCode(latin1);
   bool isCompiled = !!jitCode;

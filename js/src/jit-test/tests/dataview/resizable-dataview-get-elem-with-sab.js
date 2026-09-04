@@ -1,3 +1,4 @@
+// |jit-test| skip-if: !this.SharedArrayBuffer
 load(libdir + "dataview.js");
 
 const TypedArrays = [

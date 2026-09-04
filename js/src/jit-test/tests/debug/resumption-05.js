@@ -1,3 +1,4 @@
+// |jit-test| skip-if: nightTierEnabled()
 // null resumption value means terminate the debuggee
 
 var g = newGlobal({newCompartment: true});

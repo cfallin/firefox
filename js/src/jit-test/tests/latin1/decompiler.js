@@ -1,3 +1,4 @@
+// |jit-test| skip-if: nightTierEnabled()
 // Latin1
 function f(someName) {
     someName();

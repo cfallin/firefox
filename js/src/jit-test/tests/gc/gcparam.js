@@ -1,3 +1,4 @@
+// |jit-test| skip-if: getBuildConfiguration("wasi")
 gczeal(0);
 
 function testGetParam(key) {

@@ -1,3 +1,4 @@
+// |jit-test| skip-if: !this.SharedArrayBuffer
 load(libdir + "asserts.js");
 
 var ab_inline = new ArrayBuffer(4);

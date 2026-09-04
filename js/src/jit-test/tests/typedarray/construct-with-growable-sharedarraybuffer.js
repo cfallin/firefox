@@ -1,3 +1,4 @@
+// |jit-test| skip-if: !this.SharedArrayBuffer
 // Test TypedArray constructor when called with growable SharedArrayBuffers.
 
 function testSharedArrayBuffer() {

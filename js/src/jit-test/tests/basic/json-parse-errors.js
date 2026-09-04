@@ -1,4 +1,4 @@
-try {
+try { // |jit-test| skip-if: nightTierEnabled()
     JSON.parse('{"a":}');
 }
 catch(e) {

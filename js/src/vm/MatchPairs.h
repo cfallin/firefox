@@ -125,6 +125,15 @@ class VectorMatchPairs : public MatchPairs {
  protected:
   friend class RegExpShared;
   friend class RegExpStatics;
+#ifdef ENABLE_JS_NIGHTMONKEY
+  // The collapsed AOT regexp fast paths allocate their own pairs without
+  // going through RegExpShared::execute.
+  friend bool NightRegExpBuiltinFast(JSContext* cx, JS::Value* frame,
+                                     unsigned argc, bool searcher,
+                                     bool* handled);
+  friend bool NightRegExpExecTestFast(JSContext* cx, JS::Value* frame,
+                                      bool forTest, bool* handled);
+#endif
 
   /* MatchPair buffer allocator: set pairs_ and pairCount_. */
   bool allocOrExpandArray(size_t pairCount);

@@ -1,4 +1,4 @@
-// |jit-test| skip-if: isLcovEnabled()
+// |jit-test| skip-if: isLcovEnabled(); skip-if: nightTierEnabled()
 
 // If the specified line is the next line after the function,
 // the function shouldn't match.

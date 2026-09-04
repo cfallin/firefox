@@ -1,3 +1,4 @@
+// |jit-test| skip-if: nightTierEnabled()
 var g = newGlobal({"newCompartment": true});
 const dbg = new g.Debugger(this);
 

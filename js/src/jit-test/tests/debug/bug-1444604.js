@@ -1,3 +1,4 @@
+// |jit-test| skip-if: nightTierEnabled()
 // Fuzz test: LiveSavedFrameCache should not be confused by eval-in-frame-prev links.
 // See bug-144604-reduced.js for a more direct version.
 

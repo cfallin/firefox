@@ -263,6 +263,75 @@ set_config(
     depends_if("--enable-aot-ics-enforce")(lambda _: True),
 )
 
+# NightMonkey, the AOT compilation tier (wasm32 shell targets only): links
+# the night runtime (js/src/night/runtime/) into the shell, supports wizer
+# snapshot registration, and builds the `nightmonkey` host binary (the
+# snapshot AOT compiler).
+option(
+    "--enable-nightmonkey",
+    default=False,
+    help="{Enable|Disable} the NightMonkey AOT tier (wasm32 targets only)",
+)
+
+
+@depends("--enable-nightmonkey", target)
+def nightmonkey(value, target):
+    if value:
+        if target.cpu != "wasm32":
+            die(
+                "--enable-nightmonkey requires a wasm32 target (e.g. --target=wasm32-unknown-wasi)"
+            )
+        return True
+
+
+set_config("ENABLE_JS_NIGHTMONKEY", nightmonkey)
+set_define("ENABLE_JS_NIGHTMONKEY", nightmonkey)
+
+# NightMonkey in-process compilation (test-only): compiles scripts inside
+# the running wasm shell (--night-inprocess) and injects the compiled
+# bodies through the wasm-jit-runner hostcalls, whose imports it adds to
+# the shell module; also builds the wasm-jit-runner host binary.
+option(
+    "--enable-nightmonkey-inprocess",
+    default=False,
+    help="{Enable|Disable} NightMonkey in-process compilation "
+    "(requires --enable-nightmonkey)",
+)
+
+
+@depends("--enable-nightmonkey-inprocess", nightmonkey)
+def nightmonkey_inprocess(value, nightmonkey):
+    if value:
+        if not nightmonkey:
+            die("--enable-nightmonkey-inprocess requires --enable-nightmonkey")
+        return True
+
+
+set_config("ENABLE_JS_NIGHTMONKEY_INPROCESS", nightmonkey_inprocess)
+set_define("ENABLE_JS_NIGHTMONKEY_INPROCESS", nightmonkey_inprocess)
+
+# NightMonkey runtime diagnostics: opt-in summaries and crash-on-failure in
+# the in-process test lane. Off even in debug builds, because crashing on a
+# failed in-process batch is right for a test lane and wrong for a developer
+# who merely ran the shell without the runner.
+option(
+    "--enable-nightmonkey-debug",
+    default=False,
+    help="{Enable|Disable} NightMonkey runtime diagnostics "
+    "(requires --enable-nightmonkey)",
+)
+
+
+@depends("--enable-nightmonkey-debug", nightmonkey)
+def nightmonkey_debug(value, nightmonkey):
+    if value:
+        if not nightmonkey:
+            die("--enable-nightmonkey-debug requires --enable-nightmonkey")
+        return True
+
+
+set_config("NIGHTMONKEY_DEBUG", nightmonkey_debug)
+set_define("NIGHTMONKEY_DEBUG", nightmonkey_debug)
 
 # Enable JS Streams
 # ===================================================

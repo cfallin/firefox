@@ -56,6 +56,37 @@ JSObject* InitRegExpClass(JSContext* cx, HandleObject obj);
                                            const MatchPairs& matches,
                                            MutableHandleValue rval);
 
+#ifdef ENABLE_JS_NIGHTMONKEY
+// RegExp.cpp internals reused by the AOT regexp fast paths below, which live
+// in js/src/night/runtime/NightRegExp.cpp. `SetLastIndex` is declared without
+// its default template argument (RegExp.cpp's definition supplies it), so
+// callers here must name the specialization.
+extern int32_t CreateRegExpSearchResult(JSContext* cx,
+                                        const MatchPairs& matches);
+
+template <bool CalledFromJit>
+bool SetLastIndex(JSContext* cx, Handle<RegExpObject*> regexp,
+                  int32_t lastIndex);
+
+// Collapsed AOT-matcher fast path for the RegExpMatcher (searcher=false) /
+// RegExpSearcher (searcher=true) intrinsics; frame is the rooted AOT call
+// frame [callee, this, regexp, string, lastIndex]. On *handled, the result
+// has been written to frame[0]. *handled=false falls back to the native.
+[[nodiscard]] extern bool NightRegExpBuiltinFast(JSContext* cx,
+                                                 JS::Value* frame,
+                                                 unsigned argc, bool searcher,
+                                                 bool* handled);
+
+// Collapsed AOT fast path for the pristine RegExp.prototype.exec
+// (forTest=false) / .test (forTest=true) callee-identity arm; frame is the
+// rooted AOT call frame [callee, this(=regexp), string]. On *handled, the
+// result (match array / null / boolean) is in frame[0]. test() allocates
+// nothing on this path.
+[[nodiscard]] extern bool NightRegExpExecTestFast(JSContext* cx,
+                                                  JS::Value* frame,
+                                                  bool forTest, bool* handled);
+#endif
+
 [[nodiscard]] extern bool RegExpMatcher(JSContext* cx, unsigned argc,
                                         Value* vp);
 

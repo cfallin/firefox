@@ -1,3 +1,4 @@
+// |jit-test| skip-if: nightTierEnabled()
 load(libdir + "asm.js");
 load(libdir + "asserts.js");
 

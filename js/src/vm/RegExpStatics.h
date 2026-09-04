@@ -10,9 +10,14 @@
 #include "js/RegExpFlags.h"
 #include "vm/JSContext.h"
 #include "vm/MatchPairs.h"
+#ifdef ENABLE_JS_NIGHTMONKEY
+#  include "vm/RegExpShared.h"  // used only by updateLazily (AOT-only)
+#endif
 #include "vm/Runtime.h"
 
 namespace js {
+
+class RegExpShared;
 
 class RegExpStatics {
   /* The latest RegExp output, set after execution. */
@@ -58,6 +63,17 @@ class RegExpStatics {
   /* Mutators. */
   inline bool updateFromMatchPairs(JSContext* cx, JSLinearString* input,
                                    VectorMatchPairs& newPairs);
+
+#ifdef ENABLE_JS_NIGHTMONKEY
+  // Lazy update: record only what executeLazy needs to replay the match on
+  // the first statics read (source atom, flags, start index, input),
+  // skipping the per-match pairs copy. Only valid for a match that
+  // SUCCEEDED with exactly these arguments -- executeLazy asserts the
+  // replay succeeds. This is the cheap scheme the AOT runtime uses on its
+  // per-match paths.
+  inline void updateLazily(JSContext* cx, JSLinearString* input,
+                           RegExpShared* shared, size_t lastIndex);
+#endif
 
   inline void clear();
 
@@ -232,6 +248,20 @@ inline bool RegExpStatics::createRightContext(JSContext* cx,
   }
   return createDependent(cx, matches[0].limit, matchesInput->length(), out);
 }
+
+#ifdef ENABLE_JS_NIGHTMONKEY
+inline void RegExpStatics::updateLazily(JSContext* cx, JSLinearString* input,
+                                        RegExpShared* shared,
+                                        size_t lastIndex) {
+  MOZ_ASSERT(input && shared);
+  BarrieredSetPair<JSString, JSLinearString>(cx->zone(), pendingInput, input,
+                                             matchesInput, input);
+  lazySource = shared->getSource();
+  lazyFlags = shared->getFlags();
+  lazyIndex = lastIndex;
+  pendingLazyEvaluation = 1;
+}
+#endif
 
 inline bool RegExpStatics::updateFromMatchPairs(JSContext* cx,
                                                 JSLinearString* input,

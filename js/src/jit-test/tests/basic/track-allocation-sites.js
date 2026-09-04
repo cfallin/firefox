@@ -1,3 +1,4 @@
+// |jit-test| skip-if: nightTierEnabled()
 // Test that we can track allocation sites.
 
 enableTrackAllocations();

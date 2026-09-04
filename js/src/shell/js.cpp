@@ -172,6 +172,7 @@
 #include "js/WasmModule.h"    // JS::WasmModule
 #include "js/Wrapper.h"
 #include "proxy/DeadObjectProxy.h"  // js::IsDeadProxyObject
+#include "shell/CommonShellGlobals.h"
 #include "shell/jsoptparse.h"
 #include "shell/jsshell.h"
 #include "shell/OSObject.h"
@@ -186,6 +187,10 @@
 #include "util/StringBuilder.h"
 #include "util/Text.h"
 #include "util/WindowsWrapper.h"
+#ifdef ENABLE_JS_NIGHTMONKEY
+#  include "night/runtime/Night.h"
+#  include "night/runtime/NightRegistration.h"
+#endif
 #include "vm/ArgumentsObject.h"
 #include "vm/Compression.h"
 #include "vm/ErrorObject.h"
@@ -874,6 +879,21 @@ bool shell::OOM_printAllocationCount = false;
 
 MOZ_RUNINIT UniqueChars shell::processWideModuleLoadPath;
 
+#ifdef ENABLE_JS_NIGHTMONKEY
+// --night-snapshot: compile with full parse and register the script as an
+// AOT snapshot root. The top level executes during wizening, so the snapshot
+// captures the program's warmed-up class graph and the resumed snapshot
+// calls the program's global main().
+static bool enableNightSnapshot = false;
+#endif
+
+#ifdef ENABLE_JS_NIGHTMONKEY_INPROCESS
+// --night-inprocess state: the flag, and whether the unit being compiled is
+// the batch candidate (the positional script, or -e code without one).
+static bool enableNightInprocess = false;
+static bool nightInprocessEligible = false;
+#endif
+
 static bool SetTimeoutValue(JSContext* cx, double t);
 
 static void KillWatchdog(JSContext* cx);
@@ -1313,7 +1333,14 @@ enum class CompileUtf8 {
         .setIsRunOnce(true)
         .setNoScriptRval(true);
 
-    if (fullParse) {
+    bool wantFullParse = fullParse;
+#ifdef ENABLE_JS_NIGHTMONKEY
+    wantFullParse |= enableNightSnapshot;
+#endif
+#ifdef ENABLE_JS_NIGHTMONKEY_INPROCESS
+    wantFullParse |= enableNightInprocess && nightInprocessEligible;
+#endif
+    if (wantFullParse) {
       options.setForceFullParse();
     } else {
       options.setEagerDelazificationStrategy(defaultDelazificationMode);
@@ -1358,6 +1385,25 @@ enum class CompileUtf8 {
     return false;
   }
 
+#ifdef ENABLE_JS_NIGHTMONKEY
+  if (enableNightSnapshot) {
+    if (!JS::NightRegisterRoot(cx, script, /* executedAtInit = */ true)) {
+      return false;
+    }
+    if (!js::NightSnapshotCaptureExtras(cx, script)) {
+      return false;
+    }
+  }
+#endif
+
+#ifdef ENABLE_JS_NIGHTMONKEY_INPROCESS
+  if (enableNightInprocess && nightInprocessEligible) {
+    if (!js::CompileInProcess(cx, script)) {
+      return false;
+    }
+  }
+#endif
+
 #ifdef DEBUG
   if (dumpEntrainedVariables) {
     AnalyzeEntrainedVariables(cx, script);
@@ -1371,6 +1417,13 @@ enum class CompileUtf8 {
     if (printTiming) {
       printf("runtime = %.3f ms\n", double(t2) / PRMJ_USEC_PER_MSEC);
     }
+#ifdef ENABLE_JS_NIGHTMONKEY
+    // The heap the top level just built is the analysis oracle; capture it
+    // before the wizer snapshot freezes memory.
+    if (enableNightSnapshot && !js::NightSnapshotCaptureHeap(cx)) {
+      return false;
+    }
+#endif
   }
   return true;
 }
@@ -3566,23 +3619,8 @@ static bool PrintInternal(JSContext* cx, const CallArgs& args, RCFile* file) {
     return false;
   }
 
-  for (unsigned i = 0; i < args.length(); i++) {
-    RootedString str(cx, JS::ToString(cx, args[i]));
-    if (!str) {
-      return false;
-    }
-    UniqueChars bytes = JS_EncodeStringToUTF8(cx, str);
-    if (!bytes) {
-      return false;
-    }
-    fprintf(file->fp, "%s%s", i ? " " : "", bytes.get());
-  }
-
-  fputc('\n', file->fp);
-  fflush(file->fp);
-
-  args.rval().setUndefined();
-  return true;
+  // Shared with the AOT runtime via shell/CommonShellGlobals.
+  return js::shell::PrintArgs(cx, args, file->fp, /* newline = */ true);
 }
 
 static bool Print(JSContext* cx, unsigned argc, Value* vp) {
@@ -3673,56 +3711,6 @@ static bool StopTimingMutator(JSContext* cx, unsigned argc, Value* vp) {
             gc_ms / total_ms * 100.0);
   }
 
-  args.rval().setUndefined();
-  return true;
-}
-
-static const char* ToSource(JSContext* cx, HandleValue vp, UniqueChars* bytes) {
-  RootedString str(cx, JS_ValueToSource(cx, vp));
-  if (str) {
-    *bytes = JS_EncodeStringToUTF8(cx, str);
-    if (*bytes) {
-      return bytes->get();
-    }
-  }
-  JS_ClearPendingException(cx);
-  return "<<error converting value to string>>";
-}
-
-static bool AssertEq(JSContext* cx, unsigned argc, Value* vp) {
-  CallArgs args = CallArgsFromVp(argc, vp);
-  if (!(args.length() == 2 || (args.length() == 3 && args[2].isString()))) {
-    JS_ReportErrorNumberASCII(cx, my_GetErrorMessage, nullptr,
-                              (args.length() < 2)    ? JSSMSG_NOT_ENOUGH_ARGS
-                              : (args.length() == 3) ? JSSMSG_INVALID_ARGS
-                                                     : JSSMSG_TOO_MANY_ARGS,
-                              "assertEq");
-    return false;
-  }
-
-  bool same;
-  if (!JS::SameValue(cx, args[0], args[1], &same)) {
-    return false;
-  }
-  if (!same) {
-    UniqueChars bytes0, bytes1;
-    const char* actual = ToSource(cx, args[0], &bytes0);
-    const char* expected = ToSource(cx, args[1], &bytes1);
-    if (args.length() == 2) {
-      JS_ReportErrorNumberUTF8(cx, my_GetErrorMessage, nullptr,
-                               JSSMSG_ASSERT_EQ_FAILED, actual, expected);
-    } else {
-      RootedString message(cx, args[2].toString());
-      UniqueChars bytes2 = QuoteString(cx, message);
-      if (!bytes2) {
-        return false;
-      }
-      JS_ReportErrorNumberUTF8(cx, my_GetErrorMessage, nullptr,
-                               JSSMSG_ASSERT_EQ_FAILED_MSG, actual, expected,
-                               bytes2.get());
-    }
-    return false;
-  }
   args.rval().setUndefined();
   return true;
 }
@@ -10073,11 +10061,30 @@ static bool DisableExecutionTracing(JSContext* cx, unsigned argc,
 
 #endif  // MOZ_EXECUTION_TRACING
 
+static bool NightTierEnabled(JSContext* cx, unsigned argc, Value* vp) {
+  CallArgs args = CallArgsFromVp(argc, vp);
+#ifdef ENABLE_JS_NIGHTMONKEY
+  bool enabled = js::night::gNightActivated;
+#  ifdef ENABLE_JS_NIGHTMONKEY_INPROCESS
+  enabled = enabled || enableNightInprocess;
+#  endif
+  args.rval().setBoolean(enabled);
+#else
+  args.rval().setBoolean(false);
+#endif
+  return true;
+}
+
 // clang-format off
 static const JSFunctionSpecWithHelp shell_functions[] = {
     JS_FN_HELP("options", Options, 0, 0,
 "options([option ...])",
 "  Get or toggle JavaScript options."),
+
+    JS_FN_HELP("nightTierEnabled", NightTierEnabled, 0, 0,
+"nightTierEnabled()",
+"  True iff the AOT wasm tier is active in this shell (--night-inprocess, or\n"
+"  an activated AOT snapshot). Always false in builds without the tier."),
 
     JS_FN_HELP("load", Load, 1, 0,
 "load(['foo.js' ...])",
@@ -10177,7 +10184,7 @@ static const JSFunctionSpecWithHelp shell_functions[] = {
 "quit()",
 "  Quit the shell."),
 
-    JS_FN_HELP("assertEq", AssertEq, 2, 0,
+    JS_FN_HELP("assertEq", js::shell::AssertEq, 2, 0,
 "assertEq(actual, expected[, msg])",
 "  Throw if the first two arguments are not the same (both +0 or both -0,\n"
 "  both NaN, or non-zero and ===)."),
@@ -12061,6 +12068,15 @@ auto minVal(T a, Ts... args) {
   MultiStringRange codeChunks = op->getMultiStringOption('e');
   MultiStringRange modulePaths = op->getMultiStringOption('m');
 
+#ifdef ENABLE_JS_NIGHTMONKEY
+  enableNightSnapshot = op->getBoolOption("night-snapshot");
+  js::night::NightSetWizening(enableNightSnapshot);
+#endif
+
+#ifdef ENABLE_JS_NIGHTMONKEY_INPROCESS
+  enableNightInprocess = op->getBoolOption("night-inprocess");
+#endif
+
 #ifdef FUZZING_JS_FUZZILLI
   // Check for REPRL file source
   if (op->getBoolOption("reprl")) {
@@ -12144,9 +12160,29 @@ auto minVal(T a, Ts... args) {
       }
 
       RootedValue rval(cx);
+#ifdef ENABLE_JS_NIGHTMONKEY_INPROCESS
+      // -e code is the batch candidate only when there is no positional
+      // script (which otherwise claims the single in-process batch).
+      if (enableNightInprocess && !op->getStringArg("script")) {
+        opts.setIsRunOnce(true).setNoScriptRval(true);
+        RootedScript script(cx, JS::Compile(cx, opts, srcBuf));
+        if (!script) {
+          return false;
+        }
+        if (!js::CompileInProcess(cx, script)) {
+          return false;
+        }
+        if (!JS_ExecuteScript(cx, script)) {
+          return false;
+        }
+      } else if (!JS::Evaluate(cx, opts, srcBuf, &rval)) {
+        return false;
+      }
+#else
       if (!JS::Evaluate(cx, opts, srcBuf, &rval)) {
         return false;
       }
+#endif
 
       codeChunks.popFront();
       if (sc->quitting) {
@@ -12179,9 +12215,15 @@ auto minVal(T a, Ts... args) {
     if (!pathUtf8) {
       return false;
     }
+#ifdef ENABLE_JS_NIGHTMONKEY_INPROCESS
+    nightInprocessEligible = true;
+#endif
     if (!Process(cx, pathUtf8.get(), false, FileScript)) {
       return false;
     }
+#ifdef ENABLE_JS_NIGHTMONKEY_INPROCESS
+    nightInprocessEligible = false;
+#endif
   }
 
   if (op->getBoolOption('i')) {
@@ -13322,6 +13364,18 @@ bool InitOptionParser(OptionParser& op) {
       !op.addBoolOption('\0', "wasm-compile-and-serialize",
                         "Compile the wasm bytecode from stdin and serialize "
                         "the results to stdout") ||
+#ifdef ENABLE_JS_NIGHTMONKEY
+      !op.addBoolOption('\0', "night-snapshot",
+                        "Register the script as an AOT snapshot root and "
+                        "capture the post-top-level heap, for wizening by "
+                        "the nightmonkey compiler") ||
+#endif
+#ifdef ENABLE_JS_NIGHTMONKEY_INPROCESS
+      !op.addBoolOption('\0', "night-inprocess",
+                        "AOT-compile the positional script (or -e code) "
+                        "in-process and dispatch into the injected wasm "
+                        "bodies (requires the wasm-jit-runner hostcalls)") ||
+#endif
 #ifdef FUZZING_JS_FUZZILLI
       !op.addBoolOption('\0', "reprl", "Enable REPRL mode for fuzzing") ||
 #endif

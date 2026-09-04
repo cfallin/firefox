@@ -1,3 +1,4 @@
+// |jit-test| skip-if: nightTierEnabled()
 const mainGlobal = this;
 const debuggerGlobal = newGlobal({newCompartment: true});
 

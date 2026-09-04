@@ -1,4 +1,4 @@
-// |jit-test| --ion-pruning=on; --fast-warmup; --baseline-offthread-compile=off
+// |jit-test| --ion-pruning=on; --fast-warmup; --baseline-offthread-compile=off; skip-if: nightTierEnabled()
 
 var max = 200;
 

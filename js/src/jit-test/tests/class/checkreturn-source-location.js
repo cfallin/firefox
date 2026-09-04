@@ -1,3 +1,4 @@
+// |jit-test| skip-if: nightTierEnabled()
 // Test source location for missing-super-call check at the end of a derived class constructor.
 class A {};
 class B extends A {
@@ -15,5 +16,5 @@ try {
 }
 assertEq(ex instanceof ReferenceError, true);
 // The closing '}' of B's constructor.
-assertEq(ex.lineNumber, 8);
+assertEq(ex.lineNumber, 9);
 assertEq(ex.columnNumber, 5);

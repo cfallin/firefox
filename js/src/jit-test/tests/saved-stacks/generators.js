@@ -1,3 +1,4 @@
+// |jit-test| skip-if: nightTierEnabled()
 // Test that we can save stacks which have generator frames.
 
 const { value: frame } = (function iife1() {

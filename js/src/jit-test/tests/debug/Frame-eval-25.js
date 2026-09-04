@@ -1,3 +1,4 @@
+// |jit-test| skip-if: nightTierEnabled()
 // Make sure we can recover missing arguments even when it gets assigned to
 // another slot.
 

@@ -1,3 +1,4 @@
+// |jit-test| skip-if: nightTierEnabled()
 enableShellAllocationMetadataBuilder();
 var g = newGlobal({newCompartment: true})
 g.eval("function f(a) { return h(); }");

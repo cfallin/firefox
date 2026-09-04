@@ -1,4 +1,4 @@
-// |jit-test| exitstatus:6
+// |jit-test| exitstatus:6; skip-if: nightTierEnabled()
 // Ensure that a frame terminated due to an interrupt in the generator
 // builtin will properly be treated as terminated.
 

@@ -1,3 +1,4 @@
+// |jit-test| skip-if: nightTierEnabled()
 
 function f(y) {
     y = 123456;

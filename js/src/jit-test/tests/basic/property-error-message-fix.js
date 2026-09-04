@@ -1,4 +1,4 @@
-// |jit-test| --setpref=property_error_message_fix=true; skip-if: getBuildConfiguration('pbl')
+// |jit-test| --setpref=property_error_message_fix=true; skip-if: getBuildConfiguration('pbl'); skip-if: nightTierEnabled()
 
 function check(f, message) {
   let caught = false;

@@ -1,3 +1,4 @@
+// |jit-test| skip-if: getBuildConfiguration("wasi")
 let g = newGlobal({alwaysUseFdlibm: true});
 
 // Adapted from https://github.com/arkenfox/TZP/blob/master/tests/math.html

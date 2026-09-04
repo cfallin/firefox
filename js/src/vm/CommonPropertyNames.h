@@ -78,6 +78,8 @@
   MACRO_(caseFirst, "caseFirst")                                               \
   MACRO_(catch_, "catch")                                                      \
   MACRO_(cause, "cause")                                                       \
+  MACRO_(charAt, "charAt")                                                     \
+  MACRO_(charCodeAt, "charCodeAt")                                             \
   MACRO_(chunks, "chunks")                                                     \
   MACRO_(class_, "class")                                                      \
   MACRO_(cleanupSome, "cleanupSome")                                           \
@@ -199,6 +201,7 @@
   MACRO_(frame, "frame")                                                       \
   MACRO_(from, "from")                                                         \
   MACRO_(fromBase64, "fromBase64")                                             \
+  MACRO_(fromCharCode, "fromCharCode")                                         \
   MACRO_(fromHex, "fromHex")                                                   \
   MACRO_(fulfilled, "fulfilled")                                               \
   MACRO_(gcCycleNumber, "gcCycleNumber")                                       \

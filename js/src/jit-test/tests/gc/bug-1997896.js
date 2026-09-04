@@ -1,3 +1,5 @@
+// |jit-test| skip-if: nightTierEnabled()
+// (AOT string literals are not atoms; schedulezone("atoms") schedules the wrong zone.)
 function checkMarks(expected) {
   assertEq(getMarks().join(", "), expected.join(", "));
 }

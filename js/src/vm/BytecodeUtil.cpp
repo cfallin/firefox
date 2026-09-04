@@ -2464,11 +2464,16 @@ static bool DecompileArgumentFromStack(JSContext* cx, int formalIndex,
 
   /*
    * Settle on the nearest script frame, which should be the builtin that
-   * called the intrinsic.
+   * called the intrinsic. AOT-compiled frames are invisible to FrameIter, so
+   * the expected frame may be missing entirely; fall back to no decompiled
+   * name rather than walking some unrelated frame (or crashing on ++ of a
+   * done iterator).
    */
   FrameIter frameIter(cx);
-  MOZ_ASSERT(!frameIter.done());
-  MOZ_ASSERT(frameIter.script()->selfHosted());
+  if (frameIter.done() || !frameIter.hasScript() ||
+      !frameIter.script()->selfHosted()) {
+    return true;
+  }
 
   /*
    * Get the second-to-top frame, the non-self-hosted caller of the builtin

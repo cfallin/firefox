@@ -16,6 +16,10 @@
 #include "vm/ShapeZone.h"
 #include "vm/Watchtower.h"
 
+#ifdef ENABLE_JS_NIGHTMONKEY
+#  include "night/runtime/Night.h"  // js::night::NightAddPropCheck
+#endif
+
 #include "gc/StableCellHasher-inl.h"
 #include "vm/JSContext-inl.h"
 #include "vm/JSObject-inl.h"
@@ -129,6 +133,10 @@ bool js::NativeObject::toDictionaryMode(JSContext* cx,
   }
 
   obj->setShape(shape);
+
+#ifdef ENABLE_JS_NIGHTMONKEY
+  obj->clearNightLikelyClass(js::NightBumpSite::ToDictionary);
+#endif
 
   MOZ_ASSERT(obj->inDictionaryMode());
   obj->setDictionaryModeSlotSpan(span);
@@ -340,7 +348,13 @@ bool NativeObject::addProperty(JSContext* cx, Handle<NativeObject*> obj,
   }
 
   if (auto* shape = LookupShapeForAdd(obj->shape(), id, flags, slot)) {
-    return obj->setShapeAndAddNewSlot(cx, shape, *slot);
+    if (!obj->setShapeAndAddNewSlot(cx, shape, *slot)) {
+      return false;
+    }
+#ifdef ENABLE_JS_NIGHTMONKEY
+    night::NightAddPropCheck(obj, id, *slot, obj->numFixedSlots());
+#endif
+    return true;
   }
 
   if (obj->inDictionaryMode()) {
@@ -390,6 +404,9 @@ bool NativeObject::addProperty(JSContext* cx, Handle<NativeObject*> obj,
   if (!obj->setShapeAndAddNewSlot(cx, newShape, *slot)) {
     return false;
   }
+#ifdef ENABLE_JS_NIGHTMONKEY
+  night::NightAddPropCheck(obj, id, *slot, obj->numFixedSlots());
+#endif
 
   // Add the new shape to the old shape's shape cache, to optimize this shape
   // transition. Don't do this if we just allocated a new shape, because that
@@ -522,6 +539,10 @@ bool NativeObject::changeProperty(JSContext* cx, Handle<NativeObject*> obj,
                                   HandleId id, PropertyFlags flags,
                                   uint32_t* slotOut) {
   MOZ_ASSERT(!id.isVoid());
+
+#ifdef ENABLE_JS_NIGHTMONKEY
+  obj->clearNightLikelyClass(js::NightBumpSite::ChangeProperty);
+#endif
 
   AutoCheckShapeConsistency check(obj);
   AssertValidArrayIndex(obj, id);
@@ -696,6 +717,10 @@ bool NativeObject::changeCustomDataPropAttributes(JSContext* cx,
   AssertValidArrayIndex(obj, id);
   AssertValidCustomDataProp(obj, flags);
 
+#ifdef ENABLE_JS_NIGHTMONKEY
+  obj->clearNightLikelyClass(js::NightBumpSite::ChangeCustomDataProp);
+#endif
+
   Rooted<PropMap*> map(cx, obj->shape()->propMap());
   uint32_t mapLength = obj->shape()->propMapLength();
 
@@ -838,6 +863,10 @@ void NativeObject::setShapeAndRemoveLastSlot(JSContext* cx,
 bool NativeObject::removeProperty(JSContext* cx, Handle<NativeObject*> obj,
                                   HandleId id) {
   AutoCheckShapeConsistency check(obj);
+
+#ifdef ENABLE_JS_NIGHTMONKEY
+  obj->clearNightLikelyClass(js::NightBumpSite::RemoveProperty);
+#endif
 
   Rooted<PropMap*> map(cx, obj->shape()->propMap());
   uint32_t mapLength = obj->shape()->propMapLength();
@@ -1008,6 +1037,10 @@ bool NativeObject::freezeOrSealProperties(JSContext* cx,
                                           IntegrityLevel level) {
   AutoCheckShapeConsistency check(obj);
 
+#ifdef ENABLE_JS_NIGHTMONKEY
+  obj->clearNightLikelyClass(js::NightBumpSite::FreezeOrSeal);
+#endif
+
   if (!Watchtower::watchFreezeOrSeal(cx, obj, level)) {
     return false;
   }
@@ -1076,6 +1109,15 @@ bool JSObject::setFlag(JSContext* cx, HandleObject obj, ObjectFlag flag) {
 
   ObjectFlags objectFlags = obj->shape()->objectFlags();
   objectFlags.setFlag(flag);
+
+#ifdef ENABLE_JS_NIGHTMONKEY
+  // An object flag changes the object's semantics for compiled fast paths
+  // (a Watchtower watch expects notifications the inline stamped-set arms
+  // never send; NotExtensible/Frozen gate adds and writes). Demote so
+  // every compiled arm falls back to the engine paths that respect the
+  // flag. Rare by construction -- flags are set once per object.
+  obj->clearNightLikelyClass(js::NightBumpSite::ObjectFlagChange);
+#endif
 
   uint32_t numFixed =
       obj->is<NativeObject>() ? obj->as<NativeObject>().numFixedSlots() : 0;

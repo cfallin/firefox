@@ -1,3 +1,4 @@
+// |jit-test| skip-if: typeof Intl === 'undefined'
 function test(granularity, s0, s1) {
   var str = newString("Lorem ipsum. Dolor sit.", {twoByte: true});
   var segments = new Intl.Segmenter("en", {granularity}).segment(str);

@@ -1,3 +1,4 @@
+// |jit-test| skip-if: !this.SharedArrayBuffer
 var gsab = new SharedArrayBuffer(4, {maxByteLength: 16});
 
 // Test byte lengths are correct.

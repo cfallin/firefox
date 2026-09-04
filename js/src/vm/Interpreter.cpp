@@ -51,6 +51,10 @@
 #include "vm/GeneratorObject.h"
 #include "vm/Iteration.h"
 #include "vm/JSContext.h"
+#ifdef ENABLE_JS_NIGHTMONKEY
+#  include "night/runtime/NightEntry.h"  // js::night dispatch hooks
+#  include "night/runtime/NightStack.h"  // js::nightrt::AutoNightReentry (AOT dispatch)
+#endif
 #include "vm/JSFunction.h"
 #include "vm/JSObject.h"
 #include "vm/JSScript.h"
@@ -456,6 +460,17 @@ bool js::RunScript(JSContext* cx, RunState& state) {
     case jit::EnterJitStatus::NotEntered:
       break;
   }
+
+#ifdef ENABLE_JS_NIGHTMONKEY
+  switch (js::night::MaybeEnterNight(cx, state)) {
+    case js::night::EnterNightStatus::Error:
+      return false;
+    case js::night::EnterNightStatus::Ok:
+      return true;
+    case js::night::EnterNightStatus::NotEntered:
+      break;
+  }
+#endif
 
   bool ok = MaybeEnterInterpreterTrampoline(cx, state);
   if (!ok) {
@@ -3321,6 +3336,21 @@ bool MOZ_NEVER_INLINE JS_HAZ_JSNATIVE_CALLER js::Interpret(JSContext* cx,
               break;
           }
 
+#ifdef ENABLE_JS_NIGHTMONKEY
+          switch (js::night::MaybeEnterNight(cx, args, funScript,
+                                             bool(construct))) {
+            case js::night::EnterNightStatus::Error:
+              goto error;
+            case js::night::EnterNightStatus::Ok:
+              interpReturnOK = true;
+              CHECK_BRANCH();
+              REGS.sp = args.spAfterCall();
+              goto jit_return;
+            case js::night::EnterNightStatus::NotEntered:
+              break;
+          }
+#endif
+
 #ifdef NIGHTLY_BUILD
           // If entry trampolines are enabled, call back into
           // MaybeEnterInterpreterTrampoline so we can generate an
@@ -4232,6 +4262,37 @@ bool MOZ_NEVER_INLINE JS_HAZ_JSNATIVE_CALLER js::Interpret(JSContext* cx,
     END_CASE(CheckResumeKind)
 
     CASE(Resume) {
+#ifdef ENABLE_JS_NIGHTMONKEY
+      {
+        // A generator whose body compiled re-enters its AOT state machine:
+        // the interpreter cannot resume it, because the saved stack-storage
+        // layout is the AOT's own. EnterNightResume runs the generator to its
+        // next suspend point or completion synchronously; the result is the
+        // yielded/returned value ({value, done} objects are built by the
+        // generator bytecode).
+        auto* genRaw = &REGS.sp[-3].toObject().as<AbstractGeneratorObject>();
+        if (js::night::IsNightResumable(genRaw)) {
+          bool ok;
+          {
+            // The rooted scope closes before the dispatch below: an indirect
+            // goto cannot leave a scope holding non-trivial locals.
+            Rooted<AbstractGeneratorObject*> gen(cx, genRaw);
+            ReservedRooted<Value> val(&rootValue0, REGS.sp[-2]);
+            ReservedRooted<Value> resumeKindVal(&rootValue1, REGS.sp[-1]);
+            // Inputs are rooted here; consume the three operands and write
+            // the completion value in their place.
+            REGS.sp -= 2;
+            ok = js::night::EnterNightResume(cx, gen, val, resumeKindVal,
+                                             REGS.stackHandleAt(-1)) ==
+                 js::night::EnterNightStatus::Ok;
+          }
+          if (!ok) {
+            goto error;
+          }
+          ADVANCE_AND_DISPATCH(JSOpLength_Resume);
+        }
+      }
+#endif
       {
         Rooted<AbstractGeneratorObject*> gen(
             cx, &REGS.sp[-3].toObject().as<AbstractGeneratorObject>());

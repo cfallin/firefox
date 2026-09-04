@@ -97,6 +97,13 @@ class StaticStrings {
     return unitStaticTable[c];
   }
 
+#ifdef ENABLE_JS_NIGHTMONKEY
+  // AOT wasm codegen (js/src/night/runtime): the raw unit-string table base, published
+  // into linear memory at startup so compiled code can inline s[i] for linear
+  // latin1 strings (every latin1 char has a static unit string).
+  JSAtom* const* unitStaticTableBase() const { return unitStaticTable; }
+#endif
+
   /* May not return atom, returns null on (reported) failure. */
   inline JSLinearString* getUnitString(JSContext* cx, char16_t c);
 

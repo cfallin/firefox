@@ -1,3 +1,4 @@
+// |jit-test| skip-if: !this.SharedArrayBuffer
 function test() {
   // Mutating SharedArrayBuffer.prototype.constructor pops the fuse. A no-op change is fine.
   newGlobal().evaluate(`

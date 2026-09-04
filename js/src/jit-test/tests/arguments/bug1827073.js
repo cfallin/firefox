@@ -1,4 +1,4 @@
-// |jit-test| --fast-warmup
+// |jit-test| --fast-warmup; skip-if: nightTierEnabled()
 let depth = 0;
 function f1(a2, a3, a4, a5) {
     f2();

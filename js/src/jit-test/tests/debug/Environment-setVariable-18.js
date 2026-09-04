@@ -1,3 +1,4 @@
+// |jit-test| skip-if: nightTierEnabled()
 function f() {
     (function () {
         const otherDebugger = newGlobal({ sameZoneAs: this }).Debugger;

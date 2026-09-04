@@ -421,6 +421,30 @@ static void MaybePopWeakSetPrototypeFuses(JSContext* cx, NativeObject* obj,
   }
 }
 
+#ifdef ENABLE_JS_NIGHTMONKEY
+static void MaybePopStringPrototypeFuses(JSContext* cx, NativeObject* obj,
+                                         jsid id) {
+  if (obj != obj->global().maybeGetPrototype(JSProto_String)) {
+    return;
+  }
+  if (id.isAtom(cx->names().charCodeAt) || id.isAtom(cx->names().charAt)) {
+    obj->realm()->realmFuses.optimizeStringCharOpsFuse.popFuse(
+        cx, obj->realm()->realmFuses);
+  }
+}
+
+static void MaybePopStringConstructorFuses(JSContext* cx, NativeObject* obj,
+                                           jsid id) {
+  if (obj != obj->global().maybeGetConstructor(JSProto_String)) {
+    return;
+  }
+  if (id.isAtom(cx->names().fromCharCode)) {
+    obj->realm()->realmFuses.optimizeStringCharOpsFuse.popFuse(
+        cx, obj->realm()->realmFuses);
+  }
+}
+#endif  // ENABLE_JS_NIGHTMONKEY
+
 static void MaybePopPromiseConstructorFuses(JSContext* cx, NativeObject* obj,
                                             jsid id) {
   if (obj != obj->global().maybeGetConstructor(JSProto_Promise)) {
@@ -563,6 +587,12 @@ static void MaybePopRealmFuses(JSContext* cx, NativeObject* obj, jsid id) {
 
   // Handle writes to WeakSet.prototype fuse properties.
   MaybePopWeakSetPrototypeFuses(cx, obj, id);
+
+#ifdef ENABLE_JS_NIGHTMONKEY
+  // Handle writes to String.prototype / String constructor fuse properties.
+  MaybePopStringPrototypeFuses(cx, obj, id);
+  MaybePopStringConstructorFuses(cx, obj, id);
+#endif
 
   // Handle writes to Promise constructor fuse properties.
   MaybePopPromiseConstructorFuses(cx, obj, id);

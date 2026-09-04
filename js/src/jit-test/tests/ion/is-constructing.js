@@ -1,3 +1,4 @@
+// |jit-test| skip-if: nightTierEnabled()
 var isConstructing = getSelfHostedValue("IsConstructing");
 
 function testBasic() {

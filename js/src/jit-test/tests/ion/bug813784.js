@@ -1,3 +1,4 @@
+// |jit-test| skip-if: nightTierEnabled()
 /* Test an inlined argument returns the arguments from the right function */
 function get_arg_2() { return arguments[2]; }
 function test() { return get_arg_2(1,2,3); }

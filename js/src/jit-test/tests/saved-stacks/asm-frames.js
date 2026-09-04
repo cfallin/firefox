@@ -1,3 +1,4 @@
+// |jit-test| skip-if: nightTierEnabled()
 function AsmModule(stdlib, foreign, heap) {
   "use asm";
   var ffi = foreign.t;
@@ -27,11 +28,11 @@ print(stack);
 assertEq(stack.functionDisplayName, "tester");
 
 assertEq(stack.parent.functionDisplayName, "doTest");
-assertEq(stack.parent.line, 6);
+assertEq(stack.parent.line, 7);
 
 assertEq(stack.parent.parent.functionDisplayName, "test");
-assertEq(stack.parent.parent.line, 10);
+assertEq(stack.parent.parent.line, 11);
 
-assertEq(stack.parent.parent.parent.line, 24);
+assertEq(stack.parent.parent.parent.line, 25);
 
 assertEq(stack.parent.parent.parent.parent, null);

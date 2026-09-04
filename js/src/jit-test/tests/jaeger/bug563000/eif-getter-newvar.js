@@ -1,3 +1,4 @@
+// |jit-test| skip-if: nightTierEnabled()
 load(libdir + "evalInFrame.js");
 
 this.__defineGetter__("someProperty", function () { evalInFrame(1, "var x = 'success'"); });

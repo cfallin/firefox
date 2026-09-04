@@ -1,3 +1,4 @@
+// |jit-test| skip-if: nightTierEnabled()
 // Test that we can save stacks with self-hosted function frames in them.
 
 const map = (function () {

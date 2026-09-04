@@ -1,3 +1,5 @@
+// |jit-test| skip-if: nightTierEnabled()
+// (AOT-executed scripts never baseline-compile, so no profiler script sources register.)
 // Test that script sources are properly registered on consecutive profiler runs.
 // Bug 2002982: When the profiler is disabled and re-enabled, script sources
 // need to be re-registered because the profiler's ScriptSources hashset is

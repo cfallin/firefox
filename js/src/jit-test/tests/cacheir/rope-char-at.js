@@ -1,3 +1,5 @@
+// |jit-test| skip-if: nightTierEnabled()
+// (AOT tier flattens ropes at char-access sites by design; isRope() differs.)
 function test(a, b, firstCharCode) {
   var s = newRope(a, b);
   for (var i = 0; i < s.length; i++) {

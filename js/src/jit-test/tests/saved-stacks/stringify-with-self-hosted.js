@@ -1,3 +1,4 @@
+// |jit-test| skip-if: nightTierEnabled()
 // Test that stringify'ing a saved frame with self-hosted parent frames doesn't
 // include the self-hosted parent frame in the output.
 

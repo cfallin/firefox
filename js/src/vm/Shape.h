@@ -459,7 +459,7 @@ class Shape : public gc::CellWithTenuredGCPointer<gc::TenuredCell, BaseShape> {
     return offsetof(Shape, objectFlags_);
   }
 
-  static inline size_t offsetOfImmutableFlags() {
+  static constexpr size_t offsetOfImmutableFlags() {
     return offsetof(Shape, immutableFlags);
   }
 

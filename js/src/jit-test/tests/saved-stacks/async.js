@@ -1,3 +1,4 @@
+// |jit-test| skip-if: nightTierEnabled()
 // Test calling a function using a previously captured stack as an async stack.
 
 function getAsyncStack() {

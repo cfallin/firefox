@@ -1,0 +1,33 @@
+# The NightMonkey in-process test shell: mozconfig-nightmonkey plus
+# --enable-nightmonkey-inprocess, which links the night-compiler crate into
+# the shell (--night-inprocess compiles the positional script in-process),
+# adds the wasm-jit-runner hostcall imports, and builds the wasm-jit-runner
+# host binary used to run the shell (and the jit-tests).
+#
+#   MOZCONFIG=js/src/night/configs/mozconfig-nightmonkey-inprocess ./mach build
+#
+# Produces obj-nightmonkey-inprocess/dist/bin/js (wasm32-wasi),
+# obj-nightmonkey-inprocess/dist/bin/wasm-jit-runner, and
+# obj-nightmonkey-inprocess/dist/host/bin/nightmonkey.
+ac_add_options --enable-project=js
+ac_add_options --target=wasm32-unknown-wasi
+ac_add_options --enable-js-shell
+ac_add_options --enable-js-shell-wizer
+ac_add_options --enable-nightmonkey
+ac_add_options --enable-nightmonkey-inprocess
+ac_add_options --disable-stdcxx-compat
+ac_add_options --without-system-zlib
+ac_add_options --without-intl-api
+ac_add_options --disable-jit
+ac_add_options --disable-shared-js
+ac_add_options --disable-shared-memory
+ac_add_options --disable-tests
+ac_add_options --disable-clang-plugin
+ac_add_options --disable-debug-symbols
+ac_add_options --enable-optimize
+ac_add_options --enable-jitspew
+
+mk_add_options MOZ_OBJDIR=obj-nightmonkey-inprocess
+mk_add_options AUTOCLOBBER=1
+
+export RUSTFLAGS="-Cdebuginfo=0"

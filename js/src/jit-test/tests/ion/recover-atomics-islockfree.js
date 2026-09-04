@@ -1,4 +1,4 @@
-// |jit-test| --fast-warmup; --ion-offthread-compile=off
+// |jit-test| --fast-warmup; --ion-offthread-compile=off; skip-if: !this.Atomics
 
 function foo(n, trigger) {
   let result = Atomics.isLockFree(n * -1);

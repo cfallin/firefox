@@ -1,3 +1,5 @@
+// |jit-test| skip-if: nightTierEnabled()
+// (AOT value stack is traced conservatively (no scope-note liveness); WeakRef timing differs.)
 // Allocate the object in the function to prevent marked as a singleton so the
 // object won't be kept alive by IC stub.
 function allocObj() { return {}; }

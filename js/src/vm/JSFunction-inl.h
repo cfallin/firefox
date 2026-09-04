@@ -15,6 +15,9 @@
 #include "vm/JSContext-inl.h"
 #include "vm/JSObject-inl.h"
 #include "vm/NativeObject-inl.h"
+#ifdef ENABLE_JS_NIGHTMONKEY
+#  include "night/runtime/Night.h"  // js::night::NightWizening
+#endif
 
 namespace js {
 
@@ -150,6 +153,13 @@ inline JSAtom* JSFunction::infallibleGetUnresolvedName(JSContext* cx) {
 
   size_t propertyCountEstimate =
       script->immutableScriptData()->propertyCountEstimate;
+
+#ifdef ENABLE_JS_NIGHTMONKEY
+  if (js::night::NightWizening()) {
+    propertyCountEstimate =
+        std::max(propertyCountEstimate, js::night::kWizenThisSlots);
+  }
+#endif
 
   // Choose the alloc assuming at least the default NewObjectKind slots, but
   // bigger if our estimate shows we need it.

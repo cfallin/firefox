@@ -1,3 +1,5 @@
+// |jit-test| skip-if: nightTierEnabled()
+// (AOT string literals are fresh nursery strings, not atoms.)
 // Test nursery string allocation and pretenuring.
 
 gczeal(0);

@@ -1,3 +1,4 @@
+// |jit-test| skip-if: nightTierEnabled()
 // Test that we create new Debugger.Frames and reuse old ones correctly with recursion.
 
 var g = newGlobal({newCompartment: true});

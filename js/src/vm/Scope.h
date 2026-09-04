@@ -383,6 +383,16 @@ class Scope : public gc::TenuredCellWithNonGCPointer<BaseScopeData> {
 
   ScopeKind kind() const { return kind_; }
 
+#ifdef ENABLE_JS_NIGHTMONKEY
+  static constexpr size_t offsetOfKind() { return offsetof(Scope, kind_); }
+  static constexpr size_t offsetOfEnvironmentShape() {
+    return offsetof(Scope, environmentShape_);
+  }
+  static constexpr size_t offsetOfEnclosingScope() {
+    return offsetof(Scope, enclosingScope_);
+  }
+#endif
+
   bool isNamedLambda() const {
     return kind() == ScopeKind::NamedLambda ||
            kind() == ScopeKind::StrictNamedLambda;

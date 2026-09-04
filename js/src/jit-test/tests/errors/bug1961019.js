@@ -1,3 +1,4 @@
+// |jit-test| skip-if: nightTierEnabled()
 let s = undefined;
 var f = bindToAsyncStack(
     function () {

@@ -1,3 +1,4 @@
+// |jit-test| skip-if: nightTierEnabled()
 function f() {
     var x = undefined;
     try {

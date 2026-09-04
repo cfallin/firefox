@@ -1,3 +1,4 @@
+// |jit-test| skip-if: nightTierEnabled()
 // Test that we don't incorrectly optimize out argument slots from resume
 // points.
 

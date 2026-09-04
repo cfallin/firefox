@@ -1,3 +1,4 @@
+// |jit-test| skip-if: nightTierEnabled()
 var g = newGlobal({sameCompartmentAs: this});
 g.evaluate(`enableShellAllocationMetadataBuilder()`);
 

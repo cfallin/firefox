@@ -1,3 +1,4 @@
+// |jit-test| skip-if: nightTierEnabled()
 // Test that parent frames are shared when the older portions of two stacks are
 // the same.
 

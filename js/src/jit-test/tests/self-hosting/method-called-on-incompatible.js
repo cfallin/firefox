@@ -1,3 +1,4 @@
+// |jit-test| skip-if: nightTierEnabled()
 load(libdir + "asserts.js");
 
 assertTypeErrorMessage(() => Set.prototype.forEach.call({}), "forEach method called on incompatible Object");

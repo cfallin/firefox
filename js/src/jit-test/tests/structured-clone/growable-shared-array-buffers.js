@@ -1,3 +1,4 @@
+// |jit-test| skip-if: !this.SharedArrayBuffer
 const scopes = [
   "SameProcess",
 ];

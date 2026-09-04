@@ -1,3 +1,4 @@
+// |jit-test| skip-if: !this.SharedArrayBuffer
 // Same as inlinable-native-accessor-7.js, but now without forcing Ion ICs.
 
 // Ignore unhandled rejections when calling Promise and AsyncFunction methods.

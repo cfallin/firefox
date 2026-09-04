@@ -1,3 +1,5 @@
+// |jit-test| skip-if: nightTierEnabled()
+// (AOT literal evaluation allocates nursery strings; the minor-GC count differs.)
 // Check that we switch to allocating in the tenured heap after the first
 // nursery collection.
 

@@ -302,8 +302,8 @@ bool js::CreateRegExpMatchResult(JSContext* cx, HandleRegExpShared re,
   return true;
 }
 
-static int32_t CreateRegExpSearchResult(JSContext* cx,
-                                        const MatchPairs& matches) {
+namespace js {
+int32_t CreateRegExpSearchResult(JSContext* cx, const MatchPairs& matches) {
   MOZ_ASSERT(matches[0].start >= 0);
   MOZ_ASSERT(matches[0].limit >= 0);
 
@@ -317,6 +317,7 @@ static int32_t CreateRegExpSearchResult(JSContext* cx,
   cx->regExpSearcherLastLimit = matches[0].limit;
   return matches[0].start;
 }
+}  // namespace js
 
 /*
  * ES 2017 draft rev 6a13789aa9e7c6de4e96b7d3e24d9e6eba6584ad 21.2.5.2.2
@@ -332,9 +333,15 @@ static RegExpRunStatus ExecuteRegExpImpl(JSContext* cx, RegExpStatics* res,
 
   /* Out of spec: Update RegExpStatics. */
   if (status == RegExpRunStatus::Success && res) {
+#ifdef ENABLE_JS_NIGHTMONKEY
+    // Lazy scheme: record the replay recipe instead of copying the pairs
+    // per match; the first statics read re-executes (executeLazy).
+    res->updateLazily(cx, input, re, searchIndex);
+#else
     if (!res->updateFromMatchPairs(cx, input, *matches)) {
       return RegExpRunStatus::Error;
     }
+#endif
   }
   return status;
 }
@@ -531,9 +538,10 @@ bool js::IsRegExp(JSContext* cx, HandleValue value, bool* result) {
 // The "lastIndex" property is non-configurable, but it can be made
 // non-writable. If CalledFromJit is true, we have emitted guards to ensure it's
 // writable.
+namespace js {
 template <bool CalledFromJit = false>
-static bool SetLastIndex(JSContext* cx, Handle<RegExpObject*> regexp,
-                         int32_t lastIndex) {
+bool SetLastIndex(JSContext* cx, Handle<RegExpObject*> regexp,
+                  int32_t lastIndex) {
   MOZ_ASSERT(lastIndex >= 0);
 
   if (CalledFromJit || MOZ_LIKELY(RegExpObject::isInitialShape(regexp)) ||
@@ -545,6 +553,11 @@ static bool SetLastIndex(JSContext* cx, Handle<RegExpObject*> regexp,
   Rooted<Value> val(cx, Int32Value(lastIndex));
   return SetProperty(cx, regexp, cx->names().lastIndex, val);
 }
+#ifdef ENABLE_JS_NIGHTMONKEY
+template bool SetLastIndex<false>(JSContext* cx, Handle<RegExpObject*> regexp,
+                                  int32_t lastIndex);
+#endif
+}  // namespace js
 
 /* ES6 B.2.5.1. */
 MOZ_ALWAYS_INLINE bool regexp_compile_impl(JSContext* cx,

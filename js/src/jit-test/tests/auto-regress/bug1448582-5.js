@@ -1,3 +1,4 @@
+// |jit-test| skip-if: nightTierEnabled()
 // Repeat 1448582-{1,3,4}.js for classes.
 
 (function(index) {

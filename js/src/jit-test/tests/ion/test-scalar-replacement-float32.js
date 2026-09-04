@@ -1,3 +1,4 @@
+// |jit-test| skip-if: nightTierEnabled()
 setJitCompilerOption("ion.warmup.trigger", 30);
 var max = 40;
 

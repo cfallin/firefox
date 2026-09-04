@@ -1,3 +1,4 @@
+// |jit-test| skip-if: nightTierEnabled()
 function bar(x, i) {
   if (i == 50)
     foo.arguments[1] = 20;

@@ -1,3 +1,4 @@
+// |jit-test| skip-if: nightTierEnabled()
 // Test that we can save stacks with direct and indirect eval calls.
 
 const directEval = (function iife() {

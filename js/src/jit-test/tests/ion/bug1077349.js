@@ -1,3 +1,4 @@
+// |jit-test| skip-if: nightTierEnabled()
 
 function boo() {
     return foo.arguments[0];

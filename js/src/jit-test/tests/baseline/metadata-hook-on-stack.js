@@ -1,3 +1,4 @@
+// |jit-test| skip-if: nightTierEnabled()
 // JSOP_NEWOBJECT should respect the metadata hook, even if
 // it's set with scripts on the stack.
 

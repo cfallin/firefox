@@ -47,9 +47,16 @@ for stlfile in ["jsdate.*", "jsnum.*"]:
 with Files("builtin/intl/*"):
     BUG_COMPONENT = component_intl
 
+if CONFIG["ENABLE_JS_NIGHTMONKEY"]:
+    DIRS += [
+        "night",
+    ]
+
 if not CONFIG["JS_DISABLE_SHELL"]:
     DIRS += [
         "rust",
+    ]
+    DIRS += [
         "shell",
     ]
 
@@ -168,6 +175,7 @@ EXPORTS.js += [
     "../public/MemoryMetrics.h",
     "../public/Modules.h",
     "../public/NativeStackLimits.h",
+    "../public/NightMonkey.h",
     "../public/Object.h",
     "../public/ObjectWithStashedPointer.h",
     "../public/Prefs.h",
@@ -705,6 +713,4 @@ if CONFIG["USE_LIBZ_RS"]:
     DEFINES["USE_LIBZ_RS"] = True
 
 if CONFIG["ENABLE_JS_PBL_WEVAL"]:
-    LOCAL_INCLUDES += [
-        "../../third_party/weval"
-    ]
+    LOCAL_INCLUDES += ["../../third_party/weval"]

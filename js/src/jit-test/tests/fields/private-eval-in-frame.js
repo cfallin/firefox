@@ -1,3 +1,4 @@
+// |jit-test| skip-if: nightTierEnabled()
 load(libdir + 'asserts.js');
 load(libdir + 'evalInFrame.js');
 

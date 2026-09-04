@@ -311,6 +311,28 @@ struct OptimizeWeakSetPrototypeAddFuse final : public RealmFuse {
   virtual bool checkInvariant(JSContext* cx) override;
 };
 
+#ifdef ENABLE_JS_NIGHTMONKEY
+// Fuse guarding the original String char-op natives. If this fuse is intact,
+// the following invariants must hold:
+//
+// - The builtin `String.prototype` object has unchanged `charCodeAt` and
+//   `charAt` data properties (the original natives).
+// - The builtin `String` constructor has an unchanged `fromCharCode` data
+//   property.
+//
+// Its only consumer is the AOT runtime's inline string char-op fast paths,
+// which is why it is not read by CacheIR.
+struct OptimizeStringCharOpsFuse final : public RealmFuse {
+  virtual const char* name() override { return "OptimizeStringCharOpsFuse"; }
+  virtual bool checkInvariant(JSContext* cx) override;
+};
+
+#  define FOR_EACH_NIGHTMONKEY_REALM_FUSE(FUSE) \
+    FUSE(OptimizeStringCharOpsFuse, optimizeStringCharOpsFuse)
+#else
+#  define FOR_EACH_NIGHTMONKEY_REALM_FUSE(FUSE)
+#endif
+
 #define FOR_EACH_REALM_FUSE(FUSE)                                              \
   FUSE(OptimizeGetIteratorFuse, optimizeGetIteratorFuse)                       \
   FUSE(OptimizeArrayIteratorPrototypeFuse, optimizeArrayIteratorPrototypeFuse) \
@@ -336,7 +358,8 @@ struct OptimizeWeakSetPrototypeAddFuse final : public RealmFuse {
   FUSE(OptimizeMapPrototypeSetFuse, optimizeMapPrototypeSetFuse)               \
   FUSE(OptimizeSetPrototypeAddFuse, optimizeSetPrototypeAddFuse)               \
   FUSE(OptimizeWeakMapPrototypeSetFuse, optimizeWeakMapPrototypeSetFuse)       \
-  FUSE(OptimizeWeakSetPrototypeAddFuse, optimizeWeakSetPrototypeAddFuse)
+  FUSE(OptimizeWeakSetPrototypeAddFuse, optimizeWeakSetPrototypeAddFuse)       \
+  FOR_EACH_NIGHTMONKEY_REALM_FUSE(FUSE)
 
 struct RealmFuses {
   RealmFuses() = default;

@@ -1,0 +1,28 @@
+# -*- Mode: python; indent-tabs-mode: nil; tab-width: 40 -*-
+# vim: set filetype=python:
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+# NightMonkey: the runtime library, folded into libjs so the shell carries it.
+DIRS += ["runtime"]
+
+# `nightmonkey` is a standalone cargo project. This developer build enables its
+# wizer convenience feature, whose dependency tree stays out of the workspace
+# and its Cargo.lock. The build delegates to cargo and copies the host binary
+# into dist/host/bin.
+GENERATED_FILES += ["nightmonkey.stamp"]
+nightmonkey = GENERATED_FILES["nightmonkey.stamp"]
+nightmonkey.script = "build_nightmonkey.py"
+nightmonkey.force = True
+
+if CONFIG["ENABLE_JS_NIGHTMONKEY_INPROCESS"]:
+    # wasm-jit-runner (the jit-test / in-process shell host) is a TEST-ONLY
+    # standalone cargo project whose wasmtime-class dependency tree
+    # deliberately stays out of the workspace; the build delegates to cargo
+    # (which owns the incrementality -- a no-op rebuild is subsecond, hence
+    # force) and copies the binary into dist/bin next to the js shell.
+    GENERATED_FILES += ["night-tools.stamp"]
+    tools = GENERATED_FILES["night-tools.stamp"]
+    tools.script = "build_wasm_jit_runner.py"
+    tools.force = True

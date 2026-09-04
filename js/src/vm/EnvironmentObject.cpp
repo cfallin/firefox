@@ -30,6 +30,10 @@
 #include "wasm/WasmDebugFrame.h"
 #include "wasm/WasmInstance.h"
 
+#ifdef ENABLE_JS_NIGHTMONKEY
+#  include "night/runtime/NightEnv.h"  // night_runtime_global_lexical_shadow_added
+#endif
+
 #include "gc/Marking-inl.h"
 #include "gc/StableCellHasher-inl.h"
 #include "vm/BytecodeIterator-inl.h"
@@ -3907,6 +3911,14 @@ static bool InitGlobalOrEvalDeclarations(
                                       attrs)) {
           return false;
         }
+#ifdef ENABLE_JS_NIGHTMONKEY
+        // A GLOBAL lexical binding shadows any same-named global-object
+        // binding for every later read/write: compiled gname caches for the
+        // name must re-resolve.
+        if (lexicalEnv->is<GlobalLexicalEnvironmentObject>()) {
+          night_runtime_global_lexical_shadow_added(id.get().asRawBits());
+        }
+#endif
 
         break;
       }

@@ -1,4 +1,4 @@
-// |jit-test| --ion-eager
+// |jit-test| --ion-eager; skip-if: !this.Atomics
 
 const arr = new Int32Array(4096);
 let count = 0;

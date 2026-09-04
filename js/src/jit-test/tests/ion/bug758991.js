@@ -1,3 +1,4 @@
+// |jit-test| skip-if: nightTierEnabled()
 // Don't treat f.caller as a singleton property access, it
 // has a non-default getter.
 function f(obj) {

@@ -1,3 +1,5 @@
+// |jit-test| skip-if: nightTierEnabled()
+// (AOT allocation profile shifts a nursery-GC boundary this test counts.)
 gczeal(0);
 gcparam("minNurseryBytes", 256 * 1024);
 gcparam("maxNurseryBytes", 256 * 1024);

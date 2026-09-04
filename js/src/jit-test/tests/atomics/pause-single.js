@@ -1,4 +1,4 @@
-// |jit-test| --enable-atomics-pause; skip-if: !Atomics.pause
+// |jit-test| --enable-atomics-pause; skip-if: !this.Atomics || !Atomics.pause
 
 // Call Atomics.pause with no arguments.
 function noArguments() {

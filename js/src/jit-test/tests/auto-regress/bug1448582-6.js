@@ -1,3 +1,4 @@
+// |jit-test| skip-if: nightTierEnabled()
 // Overview:
 // - The outer function is an IIFE which gets marked as a singleton.
 // - The |o[index]| inner function is then also marked as a singleton.

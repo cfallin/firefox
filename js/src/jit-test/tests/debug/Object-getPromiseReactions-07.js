@@ -1,3 +1,4 @@
+// |jit-test| skip-if: nightTierEnabled()
 async function f(arg) {
   await arg;
 

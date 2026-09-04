@@ -25,6 +25,10 @@ UNIFIED_SOURCES += [
     "wizer.cpp",
 ]
 
+SOURCES += [
+    "CommonShellGlobals.cpp",
+]
+
 if CONFIG["FUZZING_INTERFACES"]:
     UNIFIED_SOURCES += ["jsrtfuzzing/jsrtfuzzing.cpp"]
     if CONFIG["LIBFUZZER"]:
@@ -58,7 +62,20 @@ OBJDIR_FILES.js.src += ["!/dist/bin/js%s" % CONFIG["BIN_SUFFIX"]]
 # Increase the default stack size (64KB) to 1MB.
 # Also make the stack grow towards 0 so that if SpiderMonkey's stack limiter is buggy, overflow will likely trap.
 if CONFIG["OS_ARCH"] == "WASI":
-    LDFLAGS += ["-Wl,-z,stack-size=1048576", "-Wl,--stack-first"]
+    if CONFIG["ENABLE_JS_NIGHTMONKEY"]:
+        # The AOT shell needs the memory and funcref table exported (and the
+        # table growable) so appended/injected code can share them, and a much
+        # deeper stack: the in-process compiler's Wasm lowering recurses on
+        # the main stack.
+        LDFLAGS += [
+            "-Wl,-z,stack-size=67108864",
+            "-Wl,--stack-first",
+            "-Wl,--export-memory",
+            "-Wl,--export-table",
+            "-Wl,--growable-table",
+        ]
+    else:
+        LDFLAGS += ["-Wl,-z,stack-size=1048576", "-Wl,--stack-first"]
     OS_LIBS += ["wasi-emulated-process-clocks", "wasi-emulated-getpid"]
 
 # Make JS Shell builds run without LD_LIBRARY_PATH

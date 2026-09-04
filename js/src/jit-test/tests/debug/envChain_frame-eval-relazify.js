@@ -1,4 +1,4 @@
-// |jit-test| skip-if: isLcovEnabled()
+// |jit-test| skip-if: isLcovEnabled(); skip-if: getBuildConfiguration("wasi")
 
 function func(doEval) {
   if (doEval) {

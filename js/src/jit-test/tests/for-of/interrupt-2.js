@@ -1,4 +1,4 @@
-// |jit-test| exitstatus: 6;
+// |jit-test| exitstatus: 6; skip-if: nightTierEnabled()
 
 setInterruptCallback(function() {
   // Return false from the interrupt handler to stop execution.

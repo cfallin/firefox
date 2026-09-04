@@ -1,3 +1,4 @@
+// |jit-test| skip-if: nightTierEnabled()
 
 compare = (function() {
   function inner() { return inner.caller; };

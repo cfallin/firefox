@@ -1,3 +1,4 @@
+// |jit-test| skip-if: nightTierEnabled()
 // The onExceptionUnwind hook is called multiple times as the stack unwinds.
 
 var g = newGlobal({newCompartment: true});

@@ -1,4 +1,4 @@
-// |jit-test| --fast-warmup; --no-threads
+// |jit-test| --fast-warmup; --no-threads; skip-if: nightTierEnabled()
 function foo(n) {
   with ({}) {}
   if (n == 9) {

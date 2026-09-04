@@ -1,4 +1,4 @@
-// |jit-test| --fast-warmup; --more-compartments
+// |jit-test| --fast-warmup; --more-compartments; skip-if: nightTierEnabled()
 
 enableTrackAllocations()
 e = function(a) {

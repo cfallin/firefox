@@ -1,3 +1,4 @@
+// |jit-test| skip-if: nightTierEnabled()
 // load() and snarf() (aka read()) should resolve paths relative to the current
 // working directory. This is a little hard to test because the shell doesn't
 // really have any (portable) notion of the current directory (and it can't

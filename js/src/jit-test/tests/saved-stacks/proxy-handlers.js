@@ -1,3 +1,4 @@
+// |jit-test| skip-if: nightTierEnabled()
 // Test that we can save stacks with proxy handler frames.
 
 const stack = (function iife() {

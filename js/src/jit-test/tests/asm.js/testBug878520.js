@@ -1,3 +1,4 @@
+// |jit-test| skip-if: nightTierEnabled()
 function surprise(depth) {
     arguments.callee.caller(depth);
 }

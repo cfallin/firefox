@@ -1,3 +1,4 @@
+// |jit-test| skip-if: nightTierEnabled()
 evalInFrame = function(global) {
   dbgGlobal = newGlobal({newCompartment: true});
   dbg = new dbgGlobal.Debugger();

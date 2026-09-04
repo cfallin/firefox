@@ -1,4 +1,4 @@
-try {
+try { // |jit-test| skip-if: nightTierEnabled()
     Array.from();
 } catch (e) {
     assertEq(e.columnNumber, 11);

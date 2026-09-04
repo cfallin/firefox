@@ -1,3 +1,4 @@
+// |jit-test| skip-if: nightTierEnabled()
 // Test that we can save stacks with native code on the stack.
 
 // Unlike Array.prototype.map, Array.prototype.filter is not self-hosted.

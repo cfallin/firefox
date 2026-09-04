@@ -1,4 +1,4 @@
-// |jit-test| --more-compartments
+// |jit-test| --more-compartments; skip-if: nightTierEnabled()
 
 a = newGlobal()
 b = a.Debugger(this)

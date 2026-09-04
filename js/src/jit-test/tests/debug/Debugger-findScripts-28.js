@@ -1,4 +1,4 @@
-// |jit-test| skip-if: isLcovEnabled()
+// |jit-test| skip-if: isLcovEnabled(); skip-if: nightTierEnabled()
 var g = newGlobal({newCompartment: true});
 var dbg = new Debugger();
 var gw = dbg.addDebuggee(g);

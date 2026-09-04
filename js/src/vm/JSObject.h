@@ -87,6 +87,47 @@ bool SetImmutablePrototype(JSContext* cx, JS::HandleObject obj,
  *       as before.
  *       - JSObject::swap()
  */
+#ifdef ENABLE_JS_NIGHTMONKEY
+namespace js {
+// Monotone stamp-invalidation epoch: advanced by every action that demotes
+// or rewrites an EXISTING object's night class word (claim-bit clears,
+// restamps, full clears). Fresh-object stamping does not advance it. An
+// unchanged epoch across a call proves every stamp-guarded fact the caller
+// held still holds; the night runtime reads it, compiled census builds
+// advance it through the census helper for the inline demote arms.
+extern uint64_t gNightStampEpoch;
+
+// Bump-site census hook: called on every ACTUAL epoch bump with the engine
+// path that performed it and the class word being demoted. Records into the
+// runtime census (kind 66, id = (site << 16) | class idx) when a census
+// module is running; near-free otherwise (one null check on the rare bump
+// path). Implemented in night/runtime/NightRuntime.cpp.
+extern void NightNoteEpochBump(uint32_t site, uint32_t oldWord);
+
+namespace NightBumpSite {
+// clearNightLikelyClass callers.
+static constexpr uint32_t ToDictionary = 1;
+static constexpr uint32_t ChangeProperty = 2;
+static constexpr uint32_t ChangeCustomDataProp = 3;
+static constexpr uint32_t RemoveProperty = 4;
+static constexpr uint32_t FreezeOrSeal = 5;
+static constexpr uint32_t ObjectSwap = 6;
+// nightStoreCheckOrClear callers (the setSlot/initSlot value-write chokes).
+static constexpr uint32_t StoredValue = 7;
+static constexpr uint32_t InitSlotUnchecked = 8;
+// setNightClassWord overwriting a real prior stamp (ctor restamp).
+static constexpr uint32_t ConstructStamp = 9;
+// clearNightSlotsBit callers (NightRuntime add-mismatch paths).
+static constexpr uint32_t SlotsAddMismatch = 10;
+static constexpr uint32_t SlotsAddMismatch2 = 11;
+static constexpr uint32_t SlotsAddMismatch3 = 12;
+static constexpr uint32_t SlotsAddMismatch4 = 13;
+// JSObject::setFlag (object-flag shape change, e.g. a Watchtower watch).
+static constexpr uint32_t ObjectFlagChange = 14;
+}  // namespace NightBumpSite
+}  // namespace js
+#endif
+
 class JSObject
     : public js::gc::CellWithTenuredGCPointer<js::gc::Cell, js::Shape> {
  public:
@@ -96,8 +137,19 @@ class JSObject
   // Like shape(), but uses getAtomic to read the header word.
   js::Shape* shapeMaybeForwarded() const { return headerPtrAtomic(); }
 
+#if defined(ENABLE_JS_NIGHTMONKEY) && defined(JS_64BIT)
+  // NightMonkey's likely-class word lives in the 32-bit-only alignment pad
+  // below, so the tier cannot be built 64-bit without growing every object.
+  // js/moz.configure enforces a wasm32 target; this is the backstop that
+  // turns a mis-set define into a diagnosable error rather than a confusing
+  // failure elsewhere.
+#  error "ENABLE_JS_NIGHTMONKEY requires a 32-bit target (see js/moz.configure)"
+#endif
+
 #ifndef JS_64BIT
-  // Ensure fixed slots have 8-byte alignment on 32-bit platforms.
+  // Ensure fixed slots have 8-byte alignment on 32-bit platforms. Under
+  // ENABLE_JS_NIGHTMONKEY this word holds the likely-class word (u16 index +
+  // u16 flags); 0 means "no likely class". Zeroed at birth in initShape.
   uint32_t padding_;
 #endif
 
@@ -151,7 +203,107 @@ class JSObject
     // shape we still have to initialize.
     MOZ_ASSERT(Cell::zone() == shape->zone());
     initHeaderPtr(shape);
+#ifdef ENABLE_JS_NIGHTMONKEY
+    padding_ = 0;
+#endif
   }
+
+#ifdef ENABLE_JS_NIGHTMONKEY
+  // The likely-class word: u16 stamped layout idx (low) + u16 flags half.
+  // Flags half: bit 0 (word 0x00010000) = TYPES (every masked layout
+  // field holds a value of its mask), bit 1 (0x00020000) = SLOTS (the
+  // static slot predictions are valid for this object; cleared only by
+  // add mismatches and delete/dictionary paths), bit 14 (0x40000000) =
+  // RANGES (see below), bit 15 = CONSTRUCTING sentinel, bits 2..13 =
+  // the alloc site's early class key while the sentinel is set.
+  // Epoch discipline (all three demote chokes below): a demotion bumps the
+  // epoch only for a NON-sentinel word. A mid-construction object (bit 31,
+  // the CONSTRUCTING sentinel) has idx 0, so no compiled guard can pass on
+  // it and no fact anywhere is predicated on its bits -- clearing them
+  // invalidates nothing. This mirrors the compiled demote arms'
+  // `demote_delta` exactly; an unconditional bump here is a standing false
+  // "stamps broken" signal to every fork's epoch comparison.
+  void clearNightLikelyClass(uint32_t site = 0) {
+    if (padding_) {
+      if (!(padding_ & 0x80000000u)) {
+        js::gNightStampEpoch++;
+        js::NightNoteEpochBump(site, padding_);
+      }
+      padding_ = 0;
+    }
+  }
+  // SLOTS-only clear: an add deviated from the clump's slot predictions.
+  void clearNightSlotsBit(uint32_t site = 0) {
+    if (padding_ & 0x00020000u) {
+      if (!(padding_ & 0x80000000u)) {
+        js::gNightStampEpoch++;
+        js::NightNoteEpochBump(site, padding_);
+      }
+      padding_ &= ~0x00020000u;
+    }
+  }
+  // The engine-path VALUE-write choke action.
+  //
+  // TYPES asserts per-field NUMBERNESS and nothing finer: a number store
+  // through ANY path violates no class's claim and keeps the bit. The
+  // finer per-field mask survives only because every consumer unboxes
+  // through the number-tag dispatch, i.e. re-checks the mask at the load.
+  //
+  // RANGES has no such fallback -- it is consumed CHECKLESSLY, so it
+  // cannot ride a numberness bit: an engine-path store of a number
+  // outside the predicted range would keep TYPES and be read back as
+  // in-range. Only a range-conformant compiled checked store maintains
+  // it, so every store through here drops it (owner ruling 2026-08-16;
+  // js/src/night/docs/findings-types-writer-inventory-20260816.md).
+  //
+  // Test-then-write so an unstamped receiver -- the common case -- costs
+  // one load and never dirties the header line.
+  MOZ_ALWAYS_INLINE void nightStoreCheckOrClear(const JS::Value& v,
+                                                uint32_t site = 0) {
+    uint32_t w = padding_;
+    if (MOZ_LIKELY((w & (0x00010000u | 0x40000000u)) == 0)) {
+      return;
+    }
+    uint32_t nw = w & ~0x40000000u;
+    if (!v.isNumber()) {
+      nw &= ~0x00010000u;
+    }
+    if (nw != w) {
+      if (!(w & 0x80000000u)) {
+        js::gNightStampEpoch++;
+        js::NightNoteEpochBump(site, w);
+      }
+      padding_ = nw;
+    }
+  }
+  // Advance-ineligibility marker (bit 18, the lowest early-key bit,
+  // dead once stamped): an unpredicted-key add landed beyond the
+  // object's own layout, so its own prefix predictions still hold
+  // (SLOTS stays, no epoch bump) but the bit history no longer
+  // certifies a clump sibling's extension -- the prefix-advance
+  // restamp declines on it. Only meaningful on a stamped
+  // (non-sentinel) word.
+  void setNightAdvIneligible() { padding_ |= 0x00040000u; }
+  // Construct-time allocation marker without a key: TYPES and RANGES
+  // seed (their discipline is key-free -- every unchecked write through
+  // here drops them), SLOTS cannot (adds are uncheckable without a
+  // layout).
+  void setNightConstructingSentinel() { padding_ = 0xC0010000; }
+  // Construct-time allocation word from a resolved `new` site: sentinel +
+  // early key + optimistic validity bits. The idx half stays 0 -- no
+  // idx-guarded arm can hit a mid-construction object.
+  void setNightClassWord(uint32_t w, uint32_t site = 0) {
+    // A rewrite of a real existing stamp invalidates facts about it; the
+    // first stamp of a fresh object (word 0 or the CONSTRUCTING sentinel,
+    // bit 31) invalidates nothing.
+    if (padding_ != 0 && !(padding_ & 0x80000000u) && padding_ != w) {
+      js::gNightStampEpoch++;
+      js::NightNoteEpochBump(site, padding_);
+    }
+    padding_ = w;
+  }
+  uint32_t nightClassWord() const { return padding_; }
+#endif
   void setShape(js::Shape* shape) {
     MOZ_ASSERT(maybeCCWRealm() == shape->realm());
     setHeaderPtr(shape);

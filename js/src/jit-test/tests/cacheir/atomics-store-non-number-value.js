@@ -1,3 +1,4 @@
+// |jit-test| skip-if: !this.Atomics
 const types = [
   "Int8",
   "Int16",

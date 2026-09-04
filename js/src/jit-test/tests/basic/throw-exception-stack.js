@@ -1,3 +1,4 @@
+// |jit-test| skip-if: nightTierEnabled()
 // Simple tests for getExceptionInfo behavior.
 function testTestingFunction() {
     let vals = [{}, 1, "foo", null, undefined];

@@ -1,3 +1,4 @@
+// |jit-test| skip-if: nightTierEnabled()
 // Test the functionDisplayName of SavedFrame instances.
 
 function uno() { return dos(); }

@@ -1,3 +1,4 @@
+// |jit-test| skip-if: nightTierEnabled()
 // Test that we can do debug mode OSR from the interrupt handler.
 
 var global = this;

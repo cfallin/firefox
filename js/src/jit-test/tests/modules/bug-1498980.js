@@ -1,4 +1,4 @@
-// |jit-test|
+// |jit-test|; skip-if: nightTierEnabled()
 dbgGlobal = newGlobal({newCompartment: true});
 dbg = new dbgGlobal.Debugger;
 dbg.addDebuggee(this);

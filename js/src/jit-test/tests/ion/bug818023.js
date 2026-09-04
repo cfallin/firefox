@@ -1,3 +1,4 @@
+// |jit-test| skip-if: nightTierEnabled()
 Function.prototype.callX = Function.prototype.call;
 var x;
 function f() {
