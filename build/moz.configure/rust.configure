@@ -417,6 +417,13 @@ def detect_rustc_target(
         if len(narrowed) == 1:
             return narrowed[0].rust_target
 
+        # Failing that, prefer the generic "unknown" vendor over a
+        # vendor-specific target (rustc 1.98 added x86_64-oe-linux-gnu beside
+        # x86_64-unknown-linux-gnu, and the host vendor is "pc").
+        narrowed = [c for c in candidates if c.target.vendor == "unknown"]
+        if len(narrowed) == 1:
+            return narrowed[0].rust_target
+
         return None
 
     rustc_target = find_candidate(candidates)
