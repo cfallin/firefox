@@ -45,4 +45,13 @@ def main(output):
         os.replace(tmp, dst)
         installed.append(dst)
 
+    # The jit_test.py / jstests.py shim runs the shell under the runner; a copy
+    # next to the shell lets the harnesses find the objdir from its path.
+    shim = os.path.join(srcdir, "inproc-shell.sh")
+    dst = os.path.join(dist_bin, "inproc-shell.sh")
+    tmp = dst + ".tmp"
+    shutil.copy2(shim, tmp)
+    os.replace(tmp, dst)
+    installed.append(dst)
+
     output.write("".join(p + "\n" for p in installed))

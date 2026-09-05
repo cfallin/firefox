@@ -79,7 +79,7 @@ Block Versioning, but that did not converge well.)
 | `configs/` | The mozconfigs (see "Builds"). |
 | `docs/` | `DESIGN.md`, `INTEGRATION.md`, `TODO`. |
 | `tools/` | Profiling, benchmarking, and visualization helpers (`viz.py`, `opprof.py`, `pairab.sh`, ...). |
-| `inproc-shell.sh` | `jit_test.py` shim running the wasm shell under the runner. |
+| `inproc-shell.sh` | `jit_test.py`/`jstests.py` shim running the wasm shell under the runner; the in-process build installs a copy into `dist/bin`. |
 
 ## Build flags
 
@@ -171,6 +171,14 @@ Step 3 — the full jit-test suite in both lanes:
 ```
 python3 js/src/jit-test/jit_test.py -j16 js/src/night/inproc-shell.sh
 NIGHT_INPROCESS_OFF=1 python3 js/src/jit-test/jit_test.py -j16 js/src/night/inproc-shell.sh
+```
+
+The same shim serves jstests. Through mach, the installed copy stands in for
+the shell (the jstests harness finds the objdir from its path):
+
+```
+MOZCONFIG=js/src/night/configs/mozconfig-nightmonkey-inprocess \
+    ./mach jstests --shell obj-nightmonkey-inprocess/dist/bin/inproc-shell.sh
 ```
 
 Both lanes are expected to pass completely (append a directory like `basic`

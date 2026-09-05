@@ -11,7 +11,13 @@ set -u
 
 here=$(cd "$(dirname "$0")" && pwd)
 repo=$(cd "$here/../../.." && pwd)
-SHELL_WASM=${NIGHT_WASM_SHELL:-$repo/obj-nightmonkey-inprocess/dist/bin/js}
+# The build installs a copy of this script into dist/bin next to the shell.
+if [ -f "$here/js" ]; then
+  default_shell=$here/js
+else
+  default_shell=$repo/obj-nightmonkey-inprocess/dist/bin/js
+fi
+SHELL_WASM=${NIGHT_WASM_SHELL:-$default_shell}
 # Prefer the build-installed runner next to the shell (js/src/night/moz.build
 # installs it into dist/bin); fall back to the manual in-crate build.
 default_runner=$(dirname "$SHELL_WASM")/wasm-jit-runner
