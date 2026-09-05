@@ -1,0 +1,4 @@
+# The NightMonkey in-process test shell (wasm32-wasi) plus the wasm-jit-runner
+# host that runs it. The sourced config sets MOZ_OBJDIR=obj-nightmonkey-inprocess,
+# where the test step finds dist/bin/inproc-shell.sh to use as the shell.
+. "$topsrcdir/js/src/night/configs/mozconfig-nightmonkey-inprocess"
