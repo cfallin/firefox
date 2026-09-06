@@ -25,6 +25,7 @@ jobs:
       # mach bootstrap only fetches host-target toolchains; the wasm32-wasi
       # sysroot (crt1.o, libc) must be fetched explicitly into ~/.mozbuild.
       run: |
+        rustup component add rust-src
         rustup target add wasm32-wasip1
         cd ~/.mozbuild && "$GITHUB_WORKSPACE/mach" --log-no-times artifact toolchain --from-build sysroot-wasm32-wasi
     - run: MOZCONFIG=.github/workflows/mozconfig-${{ matrix.mozconfig }} ./mach build
