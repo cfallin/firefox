@@ -680,6 +680,10 @@ OpKind wasm::Classify(OpBytes op) {
         case MiscOp::I64MulWideS:
         case MiscOp::I64MulWideU:
           return OpKind::BinaryI64Wide;
+        case MiscOp::MultiLoop:
+          return OpKind::MultiLoop;
+        case MiscOp::Label:
+          return OpKind::Label;
       }
       break;
     }
@@ -1312,6 +1316,10 @@ const char* OpBytes::toString() const {
           return "table.fill";
         case MiscOp::MemoryDiscard:
           return "memory.discard";
+        case MiscOp::MultiLoop:
+          return "multiloop";
+        case MiscOp::Label:
+          return "label";
         default:
           return "unknown";
       }

@@ -472,6 +472,14 @@ LabelKind BaseCompiler::controlKind(uint32_t relativeDepth) {
   return iter_.controlKind(relativeDepth);
 }
 
+NonAssertingLabel& BaseCompiler::branchLabel(uint32_t relativeDepth) {
+  Control& control = iter_.controlItem(relativeDepth);
+  if (iter_.controlKind(relativeDepth) != LabelKind::MultiLoop) {
+    return control.label;
+  }
+  return control.multiLoopLabels[iter_.controlLabelIndex(relativeDepth)];
+}
+
 }  // namespace wasm
 }  // namespace js
 

@@ -264,10 +264,17 @@ struct CallCompileState {
 };
 
 struct Control {
+  struct MultiLoopData {
+    BlockVector bodies;
+    uint32_t pendingLabel = UINT32_MAX;
+    bool reachable = false;
+  };
+
   MBasicBlock* block;
   UniqueTryControl tryControl;
+  UniquePtr<MultiLoopData> multiLoop;
 
-  Control() : block(nullptr), tryControl(nullptr) {}
+  Control() : block(nullptr), tryControl(nullptr), multiLoop(nullptr) {}
   Control(Control&&) = default;
   Control(const Control&) = delete;
 };
@@ -1224,8 +1231,8 @@ class FunctionCompiler {
       return false;
     }
     MTest* test = MTest::New(alloc(), check, nullptr, fallthroughBlock);
-    if (!test || !addControlFlowPatch(test, relativeDepth,
-                                      MTest::TrueBranchIndex, branchHint)) {
+    if (!test || !setBranchTarget(test, relativeDepth, MTest::TrueBranchIndex,
+                                  branchHint)) {
       return false;
     }
 
@@ -1233,7 +1240,11 @@ class FunctionCompiler {
       return false;
     }
 
+    MBasicBlock* pred = curBlock_;
     curBlock_->end(test);
+    if (!finishMultiLoopBranch(relativeDepth, pred)) {
+      return false;
+    }
     curBlock_ = fallthroughBlock;
     return true;
   }
@@ -1256,8 +1267,8 @@ class FunctionCompiler {
       return false;
     }
     MTest* test = MTest::New(alloc(), check, nullptr, fallthroughBlock);
-    if (!test || !addControlFlowPatch(test, relativeDepth,
-                                      MTest::TrueBranchIndex, branchHint)) {
+    if (!test || !setBranchTarget(test, relativeDepth, MTest::TrueBranchIndex,
+                                  branchHint)) {
       return false;
     }
 
@@ -1265,7 +1276,11 @@ class FunctionCompiler {
       return false;
     }
 
+    MBasicBlock* pred = curBlock_;
     curBlock_->end(test);
+    if (!finishMultiLoopBranch(relativeDepth, pred)) {
+      return false;
+    }
     curBlock_ = fallthroughBlock;
     return true;
   }
@@ -3677,6 +3692,114 @@ class FunctionCompiler {
     return true;
   }
 
+  [[nodiscard]] bool startMultiLoop(Control& control, uint32_t bodyCount) {
+    control.multiLoop = js::MakeUnique<Control::MultiLoopData>();
+    if (!control.multiLoop) {
+      return false;
+    }
+    Control::MultiLoopData& data = *control.multiLoop;
+    data.pendingLabel = pendingBlockDepth_++;
+    mirGraph().setHasIrreducibleCFG();
+
+    if (inDeadCode()) {
+      return true;
+    }
+    data.reachable = true;
+
+    DefVector firstParams;
+    size_t firstParamCount =
+        iter().currentMultiLoopBodyType(0).params().length();
+    if (!iter().getResults(firstParamCount, &firstParams)) {
+      return false;
+    }
+
+    if (!data.bodies.reserve(bodyCount)) {
+      return false;
+    }
+    for (uint32_t body = 0; body < bodyCount; body++) {
+      MBasicBlock* bodyBlock;
+      if (!newBlock(curBlock_, &bodyBlock)) {
+        return false;
+      }
+      bodyBlock->removePredecessor(curBlock_);
+
+      for (uint32_t slot = 0; slot < info().firstStackSlot(); slot++) {
+        MPhi* phi = MPhi::New(alloc(), curBlock_->getSlot(slot)->type());
+        if (!phi) {
+          return false;
+        }
+        bodyBlock->addPhi(phi);
+        bodyBlock->setSlot(slot, phi);
+      }
+
+      ResultType params = iter().currentMultiLoopBodyType(body).params();
+      for (size_t i = 0; i < params.length(); i++) {
+        MPhi* phi = MPhi::New(alloc(), params[i].toMIRType());
+        if (!phi || !bodyBlock->ensureHasSlots(1)) {
+          return false;
+        }
+        bodyBlock->addPhi(phi);
+        bodyBlock->push(phi);
+      }
+      if (!data.bodies.append(bodyBlock)) {
+        return false;
+      }
+    }
+
+    if (!pushDefs(firstParams)) {
+      return false;
+    }
+    MBasicBlock* entry = curBlock_;
+    entry->end(MGoto::New(alloc(), data.bodies[0]));
+    if (!addMultiLoopPredecessor(data.bodies[0], entry)) {
+      return false;
+    }
+
+    curBlock_ = nullptr;
+    return true;
+  }
+
+  [[nodiscard]] bool switchToMultiLoopBody(Control& control,
+                                            uint32_t bodyIndex,
+                                            const DefVector& previousResults) {
+    Control::MultiLoopData& data = *control.multiLoop;
+    if (!data.reachable) {
+      return true;
+    }
+
+    if (bodyIndex > 0 && !inDeadCode() &&
+        (!pushDefs(previousResults) ||
+         !goToMultiLoopBody(data.bodies[bodyIndex]))) {
+      return false;
+    }
+
+    MBasicBlock* body;
+    if (!goToNewBlock(data.bodies[bodyIndex], &body)) {
+      return false;
+    }
+    curBlock_ = body;
+    mirGraph().moveBlockToEnd(curBlock_);
+
+    DefVector params;
+    if (!popPushedDefs(&params)) {
+      return false;
+    }
+    iter().setResults(params.length(), params);
+    addInterruptCheck();
+    return true;
+  }
+
+  [[nodiscard]] bool closeMultiLoop(Control& control, DefVector* results) {
+    Control::MultiLoopData& data = *control.multiLoop;
+    if (!data.reachable) {
+      pendingBlockDepth_--;
+      return true;
+    }
+    MOZ_ASSERT(data.pendingLabel == pendingBlockDepth_ - 1);
+    pendingBlockDepth_--;
+    return inDeadCode() || popPushedDefs(results);
+  }
+
  private:
   void fixupRedundantPhis(MBasicBlock* b) {
     for (size_t i = 0, depth = b->stackDepth(); i < depth; i++) {
@@ -3731,12 +3854,12 @@ class FunctionCompiler {
     // We have to search above all enclosing try blocks, as a delegate may move
     // patches around.
     for (uint32_t depth = 0; depth < iter().controlStackDepth(); depth++) {
-      LabelKind kind = iter().controlKind(depth);
+      LabelKind kind = iter().physicalControlKind(depth);
       if (kind != LabelKind::Try && kind != LabelKind::TryTable &&
           kind != LabelKind::Body) {
         continue;
       }
-      Control& control = iter().controlItem(depth);
+      Control& control = iter().physicalControlItem(depth);
       if (!control.tryControl) {
         continue;
       }
@@ -3853,11 +3976,38 @@ class FunctionCompiler {
     return inDeadCode() || popPushedDefs(loopResults);
   }
 
+  [[nodiscard]] bool addMultiLoopPredecessor(MBasicBlock* target,
+                                              MBasicBlock* pred) {
+    MOZ_ASSERT(target->stackDepth() == pred->stackDepth());
+    for (uint32_t slot = 0; slot < target->stackDepth(); slot++) {
+      MPhi* phi = target->getSlot(slot)->toPhi();
+      if (!phi->addInputSlow(pred->getSlot(slot))) {
+        return false;
+      }
+    }
+    return target->appendPredecessor(pred);
+  }
+
+  MBasicBlock* multiLoopTarget(uint32_t relativeDepth) {
+    Control& control = iter().controlItem(relativeDepth);
+    MOZ_ASSERT(control.multiLoop);
+    uint32_t bodyIndex = iter().controlLabelIndex(relativeDepth);
+    return control.multiLoop->bodies[bodyIndex];
+  }
+
+  [[nodiscard]] bool goToMultiLoopBody(MBasicBlock* target) {
+    MBasicBlock* pred = curBlock_;
+    pred->end(MGoto::New(alloc(), target));
+    curBlock_ = nullptr;
+    return addMultiLoopPredecessor(target, pred);
+  }
+
   [[nodiscard]] bool addControlFlowPatch(
       MControlInstruction* ins, uint32_t relative, uint32_t index,
       BranchHint branchHint = BranchHint::Invalid) {
-    MOZ_ASSERT(relative < pendingBlockDepth_);
-    uint32_t absolute = pendingBlockDepth_ - 1 - relative;
+    uint32_t physicalDepth = iter().controlPhysicalDepth(relative);
+    MOZ_ASSERT(physicalDepth < pendingBlockDepth_);
+    uint32_t absolute = pendingBlockDepth_ - 1 - physicalDepth;
 
     if (absolute >= pendingBlocks_.length() &&
         !pendingBlocks_.resize(absolute + 1)) {
@@ -3869,13 +4019,38 @@ class FunctionCompiler {
         ControlFlowPatch(ins, index));
   }
 
+  [[nodiscard]] bool setBranchTarget(
+      MControlInstruction* ins, uint32_t relativeDepth, uint32_t index,
+      BranchHint branchHint = BranchHint::Invalid) {
+    if (iter().controlKind(relativeDepth) != LabelKind::MultiLoop) {
+      return addControlFlowPatch(ins, relativeDepth, index, branchHint);
+    }
+    MBasicBlock* target = multiLoopTarget(relativeDepth);
+    ins->replaceSuccessor(index, target);
+    if (branchHint == BranchHint::Likely) {
+      target->setFrequency(Frequency::Likely);
+    } else if (branchHint == BranchHint::Unlikely &&
+               target->isUnknownFrequency()) {
+      target->setFrequency(Frequency::Unlikely);
+    }
+    return true;
+  }
+
+  [[nodiscard]] bool finishMultiLoopBranch(uint32_t relativeDepth,
+                                            MBasicBlock* pred) {
+    if (iter().controlKind(relativeDepth) != LabelKind::MultiLoop) {
+      return true;
+    }
+    return addMultiLoopPredecessor(multiLoopTarget(relativeDepth), pred);
+  }
+
   [[nodiscard]] bool br(uint32_t relativeDepth, const DefVector& values) {
     if (inDeadCode()) {
       return true;
     }
 
     MGoto* jump = MGoto::New(alloc());
-    if (!addControlFlowPatch(jump, relativeDepth, MGoto::TargetIndex)) {
+    if (!setBranchTarget(jump, relativeDepth, MGoto::TargetIndex)) {
       return false;
     }
 
@@ -3883,9 +4058,10 @@ class FunctionCompiler {
       return false;
     }
 
+    MBasicBlock* pred = curBlock_;
     curBlock_->end(jump);
     curBlock_ = nullptr;
-    return true;
+    return finishMultiLoopBranch(relativeDepth, pred);
   }
 
   [[nodiscard]] bool brIf(uint32_t relativeDepth, const DefVector& values,
@@ -3900,8 +4076,8 @@ class FunctionCompiler {
     }
 
     MTest* test = MTest::New(alloc(), condition, nullptr, joinBlock);
-    if (!addControlFlowPatch(test, relativeDepth, MTest::TrueBranchIndex,
-                             branchHint)) {
+    if (!setBranchTarget(test, relativeDepth, MTest::TrueBranchIndex,
+                         branchHint)) {
       return false;
     }
 
@@ -3909,7 +4085,11 @@ class FunctionCompiler {
       return false;
     }
 
+    MBasicBlock* pred = curBlock_;
     curBlock_->end(test);
+    if (!finishMultiLoopBranch(relativeDepth, pred)) {
+      return false;
+    }
     curBlock_ = joinBlock;
 
     return true;
@@ -3925,6 +4105,81 @@ class FunctionCompiler {
     size_t numCases = depths.length();
     MOZ_ASSERT(numCases <= INT32_MAX);
     MOZ_ASSERT(numCases);
+
+    bool hasMultiLoopTarget =
+        iter().controlKind(defaultDepth) == LabelKind::MultiLoop;
+    for (uint32_t depth : depths) {
+      hasMultiLoopTarget |=
+          iter().controlKind(depth) == LabelKind::MultiLoop;
+    }
+
+    if (hasMultiLoopTarget) {
+      MTableSwitch* table =
+          MTableSwitch::New(alloc(), operand, 0, int32_t(numCases - 1));
+
+      using DepthToCaseMap =
+          HashMap<uint32_t, uint32_t, DefaultHasher<uint32_t>,
+                  SystemAllocPolicy>;
+      DepthToCaseMap depthToCase;
+      Uint32Vector multiLoopDepths;
+
+      auto addTarget = [&](uint32_t depth, bool isDefault,
+                           size_t* caseIndex) -> bool {
+        if (isDefault) {
+          if (!table->addDefault(nullptr, caseIndex)) {
+            return false;
+          }
+        } else if (!table->addSuccessor(nullptr, caseIndex)) {
+          return false;
+        }
+        if (iter().controlKind(depth) == LabelKind::MultiLoop) {
+          if (!multiLoopDepths.append(depth)) {
+            return false;
+          }
+        }
+        return setBranchTarget(table, depth, *caseIndex);
+      };
+
+      size_t defaultIndex;
+      if (!addTarget(defaultDepth, true, &defaultIndex) ||
+          !depthToCase.put(defaultDepth, defaultIndex)) {
+        return false;
+      }
+
+      for (uint32_t depth : depths) {
+        if (!mirGen().ensureBallast()) {
+          return false;
+        }
+
+        size_t caseIndex;
+        DepthToCaseMap::AddPtr p = depthToCase.lookupForAdd(depth);
+        if (!p) {
+          if (!addTarget(depth, false, &caseIndex) ||
+              !depthToCase.add(p, depth, caseIndex)) {
+            return false;
+          }
+        } else {
+          caseIndex = p->value();
+        }
+
+        if (!table->addCase(caseIndex)) {
+          return false;
+        }
+      }
+
+      if (!pushDefs(values)) {
+        return false;
+      }
+      MBasicBlock* pred = curBlock_;
+      pred->end(table);
+      curBlock_ = nullptr;
+      for (uint32_t depth : multiLoopDepths) {
+        if (!finishMultiLoopBranch(depth, pred)) {
+          return false;
+        }
+      }
+      return true;
+    }
 
     MTableSwitch* table =
         MTableSwitch::New(alloc(), operand, 0, int32_t(numCases - 1));
@@ -3999,7 +4254,7 @@ class FunctionCompiler {
     }
 
     if (callerCompiler_ && callerCompiler_->inTryCode()) {
-      *tryRelativeDepth = iter_.controlStackDepth() - 1;
+      *tryRelativeDepth = iter_.logicalControlStackDepth() - 1;
       return true;
     }
 
@@ -4013,7 +4268,7 @@ class FunctionCompiler {
       return false;
     }
 
-    if (tryRelativeDepth == iter().controlStackDepth() - 1) {
+    if (tryRelativeDepth == iter().logicalControlStackDepth() - 1) {
       *landingPadPatches = &bodyRethrowPadPatches_;
     } else {
       *landingPadPatches =
@@ -4097,7 +4352,8 @@ class FunctionCompiler {
     // Find where we are delegating the pad patches to.
     ControlInstructionVector* targetPatches;
     if (!inTryBlockFrom(relativeDepth, &targetPatches)) {
-      MOZ_ASSERT(relativeDepth <= pendingBlockDepth_ - 1);
+      MOZ_ASSERT(iter().controlPhysicalDepth(relativeDepth) <=
+                 pendingBlockDepth_ - 1);
       targetPatches = &bodyRethrowPadPatches_;
     }
 
@@ -5610,14 +5866,14 @@ class FunctionCompiler {
     MTest* test;
     if (onSuccess) {
       test = MTest::New(alloc(), success, nullptr, fallthroughBlock);
-      if (!test || !addControlFlowPatch(test, labelRelativeDepth,
-                                        MTest::TrueBranchIndex, branchHint)) {
+      if (!test || !setBranchTarget(test, labelRelativeDepth,
+                                    MTest::TrueBranchIndex, branchHint)) {
         return false;
       }
     } else {
       test = MTest::New(alloc(), success, fallthroughBlock, nullptr);
-      if (!test || !addControlFlowPatch(test, labelRelativeDepth,
-                                        MTest::FalseBranchIndex, branchHint)) {
+      if (!test || !setBranchTarget(test, labelRelativeDepth,
+                                    MTest::FalseBranchIndex, branchHint)) {
         return false;
       }
     }
@@ -5626,7 +5882,11 @@ class FunctionCompiler {
       return false;
     }
 
+    MBasicBlock* pred = curBlock_;
     curBlock_->end(test);
+    if (!finishMultiLoopBranch(labelRelativeDepth, pred)) {
+      return false;
+    }
     curBlock_ = fallthroughBlock;
     return true;
   }
@@ -5784,6 +6044,8 @@ class FunctionCompiler {
   bool emitF64Const();
   bool emitBlock();
   bool emitLoop();
+  bool emitMultiLoop();
+  bool emitLabel();
   bool emitIf();
   bool emitElse();
   bool emitEnd();
@@ -6043,6 +6305,27 @@ bool FunctionCompiler::emitLoop() {
   return true;
 }
 
+bool FunctionCompiler::emitMultiLoop() {
+  uint32_t bodyCount;
+  if (!iter().readMultiLoop(&bodyCount)) {
+    return false;
+  }
+  return startMultiLoop(iter().controlItem(), bodyCount);
+}
+
+bool FunctionCompiler::emitLabel() {
+  uint32_t bodyIndex;
+  ResultType params;
+  ResultType previousResultType;
+  DefVector previousResults;
+  if (!iter().readLabel(&bodyIndex, &params, &previousResultType,
+                        &previousResults)) {
+    return false;
+  }
+  return switchToMultiLoopBody(iter().controlItem(), bodyIndex,
+                               previousResults);
+}
+
 bool FunctionCompiler::emitIf() {
   BranchHint branchHint =
       iter().getBranchHint(funcIndex(), relativeBytecodeOffset());
@@ -6132,6 +6415,13 @@ bool FunctionCompiler::emitEnd() {
     case LabelKind::Loop:
       MOZ_ASSERT(!control.tryControl);
       if (!closeLoop(block, &postJoinDefs)) {
+        return false;
+      }
+      iter().popEnd();
+      break;
+    case LabelKind::MultiLoop:
+      MOZ_ASSERT(control.multiLoop);
+      if (!closeMultiLoop(control, &postJoinDefs)) {
         return false;
       }
       iter().popEnd();
@@ -10847,6 +11137,16 @@ bool FunctionCompiler::emitBodyExprs() {
               return iter().unrecognizedOpcode(&op);
             }
             CHECK(emitI64MulWide(/*isSigned=*/false));
+          case uint32_t(MiscOp::MultiLoop):
+            if (!codeMeta().multiLoopEnabled()) {
+              return iter().unrecognizedOpcode(&op);
+            }
+            CHECK(emitMultiLoop());
+          case uint32_t(MiscOp::Label):
+            if (!codeMeta().multiLoopEnabled()) {
+              return iter().unrecognizedOpcode(&op);
+            }
+            CHECK(emitLabel());
 
           default:
             return iter().unrecognizedOpcode(&op);

@@ -161,6 +161,14 @@
     /* flag force enable  */ false,                                     \
     /* preference name    */ wide_arithmetic)                           \
   FEATURE(                                                              \
+    /* capitalized name   */ MultiLoop,                                 \
+    /* lower case name    */ multiLoop,                                 \
+    /* compile predicate  */ 1,                                         \
+    /* compiler predicate */ AnyCompilerAvailable(cx),                  \
+    /* flag predicate     */ true,                                      \
+    /* flag force enable  */ false,                                     \
+    /* preference name    */ multiloop)                                 \
+  FEATURE(                                                              \
     /* capitalized name   */ Components,                                \
     /* lower case name    */ components,                                \
     /* compile predicate  */ WASM_COMPONENTS_ENABLED,                   \

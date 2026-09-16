@@ -75,6 +75,7 @@ struct Control {
   CatchInfoVector catchInfos;  // Used for try-catch handlers.
   size_t loopBytecodeStart;    // For LT: bytecode offset of start of a loop.
   CodeOffset offsetOfCtrDec;   // For LT: masm offset of loop's counter decr.
+  Vector<NonAssertingLabel, 4, SystemAllocPolicy> multiLoopLabels;
 
   Control()
       : stackHeight(StackHeight::Invalid()),
@@ -984,6 +985,7 @@ struct BaseCompiler final {
   inline Control& controlItem(uint32_t relativeDepth);
   inline Control& controlOutermost();
   inline LabelKind controlKind(uint32_t relativeDepth);
+  inline NonAssertingLabel& branchLabel(uint32_t relativeDepth);
 
   ////////////////////////////////////////////////////////////
   //
@@ -1514,6 +1516,8 @@ struct BaseCompiler final {
   [[nodiscard]] bool emitBody();
   [[nodiscard]] bool emitBlock();
   [[nodiscard]] bool emitLoop();
+  [[nodiscard]] bool emitMultiLoop();
+  [[nodiscard]] bool emitLabel();
   [[nodiscard]] bool emitIf();
   [[nodiscard]] bool emitElse();
   // Used for common setup for catch and catch_all.

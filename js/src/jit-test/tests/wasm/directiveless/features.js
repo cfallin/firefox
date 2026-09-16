@@ -39,6 +39,12 @@ function check(text, imports) {
   }
 }
 
+function checkBinary(hex) {
+  return WebAssembly.validate(
+    Uint8Array.from(hex.match(/../g), byte => parseInt(byte, 16))
+  );
+}
+
 const DISABLED = "disabled";
 const NIGHTLY = "nightly";
 const RELEASED_MAYBE_DISABLED = "released-maybe-disabled";
@@ -46,6 +52,12 @@ const RELEASED = "released";
 const IGNORE = "ignore";
 
 let features = {
+  "multiLoop": {
+    status: DISABLED,
+    test: () => checkBinary(
+      "0061736d01000000010401600000030201000a0b010900fc170140fc180b0b"
+    ),
+  },
   "stackSwitching": {
     status: DISABLED,
     test: () => check(`(tag) (func unreachable resume 0 unreachable)`)

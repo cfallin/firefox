@@ -2071,6 +2071,30 @@ bool wasm::ValidateOps(ValidatingOpIter& iter, T& dumper,
             }
             break;
           }
+          case uint32_t(MiscOp::MultiLoop): {
+            if (!codeMeta.multiLoopEnabled()) {
+              return iter.unrecognizedOpcode(&op);
+            }
+            uint32_t bodyCount;
+            if (!iter.readMultiLoop(&bodyCount)) {
+              return false;
+            }
+            dumper.startScope();
+            break;
+          }
+          case uint32_t(MiscOp::Label): {
+            if (!codeMeta.multiLoopEnabled()) {
+              return iter.unrecognizedOpcode(&op);
+            }
+            uint32_t bodyIndex;
+            ResultType paramType;
+            ResultType previousResultType;
+            if (!iter.readLabel(&bodyIndex, &paramType, &previousResultType,
+                                &nothings)) {
+              return false;
+            }
+            break;
+          }
           default:
             return iter.unrecognizedOpcode(&op);
         }

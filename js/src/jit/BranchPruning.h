@@ -19,6 +19,9 @@ class MIRGraph;
 [[nodiscard]] bool PruneUnusedBranches(const MIRGenerator* mir,
                                        MIRGraph& graph);
 
+[[nodiscard]] bool PruneUnreachableBlocks(const MIRGenerator* mir,
+                                          MIRGraph& graph);
+
 [[nodiscard]] bool RemoveUnmarkedBlocks(const MIRGenerator* mir,
                                         MIRGraph& graph,
                                         uint32_t numMarkedBlocks);

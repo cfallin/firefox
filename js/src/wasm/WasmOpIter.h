@@ -36,6 +36,7 @@ enum class LabelKind : uint8_t {
   Body,
   Block,
   Loop,
+  MultiLoop,
   Then,
   Else,
   Try,
@@ -43,6 +44,17 @@ enum class LabelKind : uint8_t {
   CatchAll,
   TryTable,
 };
+
+using BlockTypeVector = Vector<BlockType, 4, SystemAllocPolicy>;
+
+struct MultiLoopInfo {
+  BlockTypeVector bodyTypes;
+  uint32_t activeBody = UINT32_MAX;
+};
+
+using UniqueMultiLoopInfo = UniquePtr<MultiLoopInfo>;
+using UniqueMultiLoopInfoVector =
+    Vector<UniqueMultiLoopInfo, 2, SystemAllocPolicy>;
 
 // The type of values on the operand stack during validation.  This is either a
 // ValType or the special type "Bottom".
@@ -132,6 +144,8 @@ class StackType {
 enum class OpKind {
   Block,
   Loop,
+  MultiLoop,
+  Label,
   Unreachable,
   Drop,
   I32Const,
@@ -273,26 +287,53 @@ class ControlStackEntry {
   bool polymorphicBase_;
 
   LabelKind kind_;
+  MultiLoopInfo* multiLoopInfo_;
 
  public:
-  ControlStackEntry(LabelKind kind, BlockType type, uint32_t valueStackBase)
+  ControlStackEntry(LabelKind kind, BlockType type, uint32_t valueStackBase,
+                    MultiLoopInfo* multiLoopInfo = nullptr)
       : typeAndItem_(type, ControlItem()),
         valueStackBase_(valueStackBase),
         polymorphicBase_(false),
-        kind_(kind) {
+        kind_(kind),
+        multiLoopInfo_(multiLoopInfo) {
     MOZ_ASSERT(type != BlockType());
+    MOZ_ASSERT((kind == LabelKind::MultiLoop) == bool(multiLoopInfo));
   }
 
   LabelKind kind() const { return kind_; }
   BlockType type() const { return typeAndItem_.first(); }
-  ResultType resultType() const { return type().results(); }
-  ResultType branchTargetType() const {
+  ResultType resultType() const {
+    if (kind_ == LabelKind::MultiLoop) {
+      MOZ_ASSERT(multiLoopInfo_->activeBody < multiLoopInfo_->bodyTypes.length());
+      return multiLoopInfo_->bodyTypes[multiLoopInfo_->activeBody].results();
+    }
+    return type().results();
+  }
+  ResultType branchTargetType(uint32_t labelIndex = 0) const {
+    if (kind_ == LabelKind::MultiLoop) {
+      MOZ_ASSERT(labelIndex < multiLoopInfo_->bodyTypes.length());
+      return multiLoopInfo_->bodyTypes[labelIndex].params();
+    }
     return kind_ == LabelKind::Loop ? type().params() : type().results();
+  }
+  uint32_t logicalLabelCount() const {
+    return kind_ == LabelKind::MultiLoop ? multiLoopInfo_->bodyTypes.length()
+                                         : 1;
+  }
+  MultiLoopInfo& multiLoopInfo() {
+    MOZ_ASSERT(kind_ == LabelKind::MultiLoop);
+    return *multiLoopInfo_;
+  }
+  const MultiLoopInfo& multiLoopInfo() const {
+    MOZ_ASSERT(kind_ == LabelKind::MultiLoop);
+    return *multiLoopInfo_;
   }
   uint32_t valueStackBase() const { return valueStackBase_; }
   ControlItem& controlItem() { return typeAndItem_.second(); }
   const ControlItem& controlItem() const { return typeAndItem_.second(); }
   void setPolymorphicBase() { polymorphicBase_ = true; }
+  void clearPolymorphicBase() { polymorphicBase_ = false; }
   bool polymorphicBase() const { return polymorphicBase_; }
 
   void switchToElse() {
@@ -432,6 +473,8 @@ class MOZ_STACK_CLASS OpIter : private Policy {
   TypeAndValueStack valueStack_;
   TypeAndValueStack elseParamStack_;
   ControlStack controlStack_;
+  UniqueMultiLoopInfoVector multiLoopInfos_;
+  uint32_t logicalControlStackDepth_ = 0;
   UnsetLocalsState unsetLocals_;
   FeatureUsage featureUsage_;
   uint32_t lastBranchHintIndex_ = 0;
@@ -502,10 +545,12 @@ class MOZ_STACK_CLASS OpIter : private Policy {
                                          ValueVector* values,
                                          bool rewriteStackTypes);
 
-  [[nodiscard]] bool pushControl(LabelKind kind, BlockType type);
+  [[nodiscard]] bool pushControl(LabelKind kind, BlockType type,
+                                 MultiLoopInfo* multiLoopInfo = nullptr);
   [[nodiscard]] bool checkStackAtEndOfBlock(ResultType* type,
-                                            ValueVector* values);
-  [[nodiscard]] bool getControl(uint32_t relativeDepth, Control** controlEntry);
+                                             ValueVector* values);
+  [[nodiscard]] bool getControl(uint32_t relativeDepth, Control** controlEntry,
+                                uint32_t* labelIndex = nullptr);
   [[nodiscard]] bool checkBranchValueAndPush(uint32_t relativeDepth,
                                              ResultType* type,
                                              ValueVector* values,
@@ -662,6 +707,10 @@ class MOZ_STACK_CLASS OpIter : private Policy {
   [[nodiscard]] bool readReturn(ValueVector* values);
   [[nodiscard]] bool readBlock(BlockType* type);
   [[nodiscard]] bool readLoop(BlockType* type);
+  [[nodiscard]] bool readMultiLoop(uint32_t* bodyCount);
+  [[nodiscard]] bool readLabel(uint32_t* bodyIndex, ResultType* paramType,
+                               ResultType* previousResultType,
+                               ValueVector* previousResults);
   [[nodiscard]] bool readIf(BlockType* type, Value* condition);
   [[nodiscard]] bool readElse(ResultType* paramType, ResultType* resultType,
                               ValueVector* thenResults);
@@ -915,12 +964,37 @@ class MOZ_STACK_CLASS OpIter : private Policy {
 
   // Return a reference to an element in the control stack.
   ControlItem& controlItem(uint32_t relativeDepth) {
+    Control* control = nullptr;
+    MOZ_ALWAYS_TRUE(getControl(relativeDepth, &control));
+    return control->controlItem();
+  }
+
+  ControlItem& physicalControlItem(uint32_t relativeDepth) {
     return controlStack_[controlStack_.length() - 1 - relativeDepth]
         .controlItem();
   }
 
+  uint32_t controlLabelIndex(uint32_t relativeDepth) {
+    Control* control = nullptr;
+    uint32_t labelIndex;
+    MOZ_ALWAYS_TRUE(getControl(relativeDepth, &control, &labelIndex));
+    return labelIndex;
+  }
+
+  uint32_t controlPhysicalDepth(uint32_t relativeDepth) {
+    Control* control = nullptr;
+    MOZ_ALWAYS_TRUE(getControl(relativeDepth, &control));
+    return controlStack_.end() - control - 1;
+  }
+
   // Return the LabelKind of an element in the control stack.
   LabelKind controlKind(uint32_t relativeDepth) {
+    Control* control = nullptr;
+    MOZ_ALWAYS_TRUE(getControl(relativeDepth, &control));
+    return control->kind();
+  }
+
+  LabelKind physicalControlKind(uint32_t relativeDepth) {
     return controlStack_[controlStack_.length() - 1 - relativeDepth].kind();
   }
 
@@ -933,6 +1007,15 @@ class MOZ_STACK_CLASS OpIter : private Policy {
 
   // Return the depth of the control stack.
   size_t controlStackDepth() const { return controlStack_.length(); }
+  size_t logicalControlStackDepth() const {
+    return logicalControlStackDepth_;
+  }
+
+  BlockType currentMultiLoopBodyType(uint32_t bodyIndex) const {
+    const Control& control = controlStack_.back();
+    MOZ_ASSERT(control.kind() == LabelKind::MultiLoop);
+    return control.multiLoopInfo().bodyTypes[bodyIndex];
+  }
 
   // Find the innermost control item matching a predicate, starting to search
   // from a certain relative depth, and returning true if such innermost
@@ -941,12 +1024,24 @@ class MOZ_STACK_CLASS OpIter : private Policy {
   template <typename Predicate>
   bool controlFindInnermostFrom(Predicate predicate, uint32_t fromRelativeDepth,
                                 uint32_t* foundRelativeDepth) const {
-    int32_t fromAbsoluteDepth = controlStack_.length() - fromRelativeDepth - 1;
-    for (int32_t i = fromAbsoluteDepth; i >= 0; i--) {
-      if (predicate(controlStack_[i].kind(), controlStack_[i].controlItem())) {
-        *foundRelativeDepth = controlStack_.length() - 1 - i;
+    MOZ_ASSERT(fromRelativeDepth < logicalControlStackDepth_);
+    uint32_t relativeDepth = 0;
+    bool reachedStart = false;
+    for (size_t i = controlStack_.length(); i > 0; i--) {
+      const Control& control = controlStack_[i - 1];
+      uint32_t count = control.logicalLabelCount();
+      if (!reachedStart) {
+        if (fromRelativeDepth >= relativeDepth + count) {
+          relativeDepth += count;
+          continue;
+        }
+        reachedStart = true;
+      }
+      if (predicate(control.kind(), control.controlItem())) {
+        *foundRelativeDepth = std::max(relativeDepth, fromRelativeDepth);
         return true;
       }
+      relativeDepth += count;
     }
     return false;
   }
@@ -1186,7 +1281,8 @@ inline bool OpIter<Policy>::checkTopTypeMatches(ResultType expected,
 }
 
 template <typename Policy>
-inline bool OpIter<Policy>::pushControl(LabelKind kind, BlockType type) {
+inline bool OpIter<Policy>::pushControl(LabelKind kind, BlockType type,
+                                        MultiLoopInfo* multiLoopInfo) {
   ResultType paramType = type.params();
 
   ValueVector values;
@@ -1195,14 +1291,20 @@ inline bool OpIter<Policy>::pushControl(LabelKind kind, BlockType type) {
   }
   MOZ_ASSERT(valueStack_.length() >= paramType.length());
   uint32_t valueStackBase = valueStack_.length() - paramType.length();
-  return controlStack_.emplaceBack(kind, type, valueStackBase);
+  uint32_t logicalLabelCount =
+      multiLoopInfo ? multiLoopInfo->bodyTypes.length() : 1;
+  if (!controlStack_.emplaceBack(kind, type, valueStackBase, multiLoopInfo)) {
+    return false;
+  }
+  logicalControlStackDepth_ += logicalLabelCount;
+  return true;
 }
 
 template <typename Policy>
 inline bool OpIter<Policy>::checkStackAtEndOfBlock(ResultType* expectedType,
                                                    ValueVector* values) {
   Control& block = controlStack_.back();
-  *expectedType = block.type().results();
+  *expectedType = block.resultType();
 
   MOZ_ASSERT(valueStack_.length() >= block.valueStackBase());
   if (expectedType->length() < valueStack_.length() - block.valueStackBase()) {
@@ -1215,13 +1317,36 @@ inline bool OpIter<Policy>::checkStackAtEndOfBlock(ResultType* expectedType,
 
 template <typename Policy>
 inline bool OpIter<Policy>::getControl(uint32_t relativeDepth,
-                                       Control** controlEntry) {
-  if (relativeDepth >= controlStack_.length()) {
+                                       Control** controlEntry,
+                                       uint32_t* labelIndex) {
+  if (relativeDepth >= logicalControlStackDepth_) {
     return fail("branch depth exceeds current nesting level");
   }
 
-  *controlEntry = &controlStack_[controlStack_.length() - 1 - relativeDepth];
-  return true;
+  if (multiLoopInfos_.empty()) {
+    *controlEntry =
+        &controlStack_[controlStack_.length() - 1 - relativeDepth];
+    if (labelIndex) {
+      *labelIndex = 0;
+    }
+    return true;
+  }
+
+  uint32_t remaining = relativeDepth;
+  for (size_t i = controlStack_.length(); i > 0; i--) {
+    Control& control = controlStack_[i - 1];
+    uint32_t count = control.logicalLabelCount();
+    if (remaining < count) {
+      *controlEntry = &control;
+      if (labelIndex) {
+        *labelIndex = remaining;
+      }
+      return true;
+    }
+    remaining -= count;
+  }
+
+  MOZ_CRASH("checked logical control stack depth");
 }
 
 template <typename Policy>
@@ -1271,6 +1396,14 @@ inline bool OpIter<Policy>::readOp(OpBytes* op) {
     return fail("unable to read opcode");
   }
 
+  Control& control = controlStack_.back();
+  if (control.kind() == LabelKind::MultiLoop &&
+      control.multiLoopInfo().activeBody == UINT32_MAX &&
+      !(op->b0 == uint16_t(Op::MiscPrefix) &&
+        op->b1 == uint32_t(MiscOp::Label))) {
+    return fail("multiloop header must be followed by label");
+  }
+
 #ifdef DEBUG
   op_ = *op;
 #endif
@@ -1295,6 +1428,8 @@ inline bool OpIter<Policy>::startFunction(uint32_t funcIndex) {
   MOZ_ASSERT(elseParamStack_.empty());
   MOZ_ASSERT(valueStack_.empty());
   MOZ_ASSERT(controlStack_.empty());
+  MOZ_ASSERT(multiLoopInfos_.empty());
+  MOZ_ASSERT(logicalControlStackDepth_ == 0);
   MOZ_ASSERT(op_.b0 == uint16_t(Op::Limit));
   BlockType type = BlockType::FuncResults(codeMeta_.getFuncType(funcIndex));
 
@@ -1321,6 +1456,8 @@ inline bool OpIter<Policy>::endFunction(const uint8_t* bodyEnd) {
   if (!controlStack_.empty()) {
     return fail("unbalanced function body control flow");
   }
+  MOZ_ASSERT(multiLoopInfos_.empty());
+  MOZ_ASSERT(logicalControlStackDepth_ == 0);
   MOZ_ASSERT(elseParamStack_.empty());
   MOZ_ASSERT(unsetLocals_.empty());
 
@@ -1406,6 +1543,96 @@ inline bool OpIter<Policy>::readLoop(BlockType* type) {
 }
 
 template <typename Policy>
+inline bool OpIter<Policy>::readMultiLoop(uint32_t* bodyCount) {
+  MOZ_ASSERT(Classify(op_) == OpKind::MultiLoop);
+
+  if (!readVarU32(bodyCount)) {
+    return fail("unable to read multiloop body count");
+  }
+  if (*bodyCount == 0 || *bodyCount > MaxMultiLoopBodies) {
+    return fail("invalid multiloop body count");
+  }
+
+  auto info = js::MakeUnique<MultiLoopInfo>();
+  if (!info || !info->bodyTypes.reserve(*bodyCount)) {
+    return false;
+  }
+
+  for (uint32_t i = 0; i < *bodyCount; i++) {
+    BlockType type;
+    if (!readBlockType(&type) || !info->bodyTypes.append(type)) {
+      return false;
+    }
+    if (i == 0) {
+      continue;
+    }
+
+    ResultType previousResults = info->bodyTypes[i - 1].results();
+    ResultType params = type.params();
+    if (previousResults.length() != params.length()) {
+      return fail("multiloop fallthrough types differ");
+    }
+    for (size_t j = 0; j < params.length(); j++) {
+      if (previousResults[j] != params[j]) {
+        return fail("multiloop fallthrough types differ");
+      }
+    }
+  }
+
+  MultiLoopInfo* infoPtr = info.get();
+  BlockType firstType = info->bodyTypes[0];
+  if (!multiLoopInfos_.append(std::move(info))) {
+    return false;
+  }
+  if (!pushControl(LabelKind::MultiLoop, firstType, infoPtr)) {
+    multiLoopInfos_.popBack();
+    return false;
+  }
+  return true;
+}
+
+template <typename Policy>
+inline bool OpIter<Policy>::readLabel(uint32_t* bodyIndex,
+                                      ResultType* paramType,
+                                      ResultType* previousResultType,
+                                      ValueVector* previousResults) {
+  MOZ_ASSERT(Classify(op_) == OpKind::Label);
+
+  Control& control = controlStack_.back();
+  if (control.kind() != LabelKind::MultiLoop) {
+    return fail("label outside multiloop or too many labels");
+  }
+
+  MultiLoopInfo& info = control.multiLoopInfo();
+  if (info.activeBody == UINT32_MAX) {
+    info.activeBody = 0;
+    *bodyIndex = 0;
+    *paramType = info.bodyTypes[0].params();
+    *previousResultType = ResultType();
+    return true;
+  }
+
+  if (info.activeBody + 1 >= info.bodyTypes.length()) {
+    return fail("label outside multiloop or too many labels");
+  }
+  if (!checkStackAtEndOfBlock(previousResultType, previousResults)) {
+    return false;
+  }
+
+  valueStack_.shrinkTo(control.valueStackBase());
+  info.activeBody++;
+  *bodyIndex = info.activeBody;
+  *paramType = info.bodyTypes[info.activeBody].params();
+  if (!push(*paramType)) {
+    return false;
+  }
+
+  unsetLocals_.resetToBlock(controlStack_.length() - 1);
+  control.clearPolymorphicBase();
+  return true;
+}
+
+template <typename Policy>
 inline bool OpIter<Policy>::readIf(BlockType* type, Value* condition) {
   MOZ_ASSERT(Classify(op_) == OpKind::If);
 
@@ -1464,6 +1691,12 @@ inline bool OpIter<Policy>::readEnd(LabelKind* kind, ResultType* type,
 
   Control& block = controlStack_.back();
 
+  if (block.kind() == LabelKind::MultiLoop &&
+      block.multiLoopInfo().activeBody + 1 !=
+          block.multiLoopInfo().bodyTypes.length()) {
+    return fail("multiloop has missing labels");
+  }
+
   if (!checkStackAtEndOfBlock(type, results)) {
     return false;
   }
@@ -1499,7 +1732,13 @@ template <typename Policy>
 inline void OpIter<Policy>::popEnd() {
   MOZ_ASSERT(Classify(op_) == OpKind::End);
 
+  uint32_t logicalLabelCount = controlStack_.back().logicalLabelCount();
+  bool isMultiLoop = controlStack_.back().kind() == LabelKind::MultiLoop;
   controlStack_.popBack();
+  logicalControlStackDepth_ -= logicalLabelCount;
+  if (isMultiLoop) {
+    multiLoopInfos_.popBack();
+  }
   unsetLocals_.resetToBlock(controlStack_.length());
 }
 
@@ -1509,11 +1748,12 @@ inline bool OpIter<Policy>::checkBranchValueAndPush(uint32_t relativeDepth,
                                                     ValueVector* values,
                                                     bool rewriteStackTypes) {
   Control* block = nullptr;
-  if (!getControl(relativeDepth, &block)) {
+  uint32_t labelIndex;
+  if (!getControl(relativeDepth, &block, &labelIndex)) {
     return false;
   }
 
-  *type = block->branchTargetType();
+  *type = block->branchTargetType(labelIndex);
   return checkTopTypeMatches(*type, values, rewriteStackTypes);
 }
 
@@ -1563,11 +1803,12 @@ inline bool OpIter<Policy>::checkBrTableEntryAndPush(
   }
 
   Control* block = nullptr;
-  if (!getControl(*relativeDepth, &block)) {
+  uint32_t labelIndex;
+  if (!getControl(*relativeDepth, &block, &labelIndex)) {
     return false;
   }
 
-  *type = block->branchTargetType();
+  *type = block->branchTargetType(labelIndex);
 
   if (prevBranchType.valid()) {
     if (prevBranchType.length() != type->length()) {
@@ -1740,11 +1981,12 @@ inline bool OpIter<Policy>::readTryTable(BlockType* type,
     }
 
     Control* block;
-    if (!getControl(tryTableCatch.labelRelativeDepth, &block)) {
+    uint32_t labelIndex;
+    if (!getControl(tryTableCatch.labelRelativeDepth, &block, &labelIndex)) {
       return false;
     }
 
-    ResultType blockTargetType = block->branchTargetType();
+    ResultType blockTargetType = block->branchTargetType(labelIndex);
     if (!checkIsSubtypeOf(ResultType::Vector(tryTableCatch.labelType),
                           blockTargetType)) {
       return false;
@@ -1838,7 +2080,7 @@ inline bool OpIter<Policy>::readDelegate(uint32_t* relativeDepth,
   }
 
   // Depths for delegate start counting in the surrounding block.
-  if (delegateDepth >= controlStack_.length() - 1) {
+  if (delegateDepth >= logicalControlStackDepth_ - 1) {
     return fail("delegate depth exceeds current nesting level");
   }
   *relativeDepth = delegateDepth + 1;
@@ -1855,6 +2097,7 @@ inline void OpIter<Policy>::popDelegate() {
   MOZ_ASSERT(Classify(op_) == OpKind::Delegate);
 
   controlStack_.popBack();
+  logicalControlStackDepth_--;
   unsetLocals_.resetToBlock(controlStack_.length());
 }
 
@@ -1904,7 +2147,7 @@ inline bool OpIter<Policy>::readRethrow(uint32_t* relativeDepth) {
     return fail("unable to read rethrow depth");
   }
 
-  if (*relativeDepth >= controlStack_.length()) {
+  if (*relativeDepth >= logicalControlStackDepth_) {
     return fail("rethrow depth exceeds current nesting level");
   }
   LabelKind kind = controlKind(*relativeDepth);
@@ -2505,11 +2748,12 @@ inline bool OpIter<Policy>::readBrOnNonNull(uint32_t* relativeDepth,
   }
 
   Control* block = nullptr;
-  if (!getControl(*relativeDepth, &block)) {
+  uint32_t labelIndex;
+  if (!getControl(*relativeDepth, &block, &labelIndex)) {
     return false;
   }
 
-  *type = block->branchTargetType();
+  *type = block->branchTargetType(labelIndex);
 
   // Check we at least have one type in the branch target type.
   if (type->length() < 1) {
@@ -3344,11 +3588,12 @@ inline bool OpIter<Policy>::readHandlers(HandlerExprVector* handlers,
         }
 
         Control* block = nullptr;
-        if (!getControl(labelDepth, &block)) {
+        uint32_t labelIndex;
+        if (!getControl(labelDepth, &block, &labelIndex)) {
           return false;
         }
 
-        ResultType branchTargetType = block->branchTargetType();
+        ResultType branchTargetType = block->branchTargetType(labelIndex);
 
         // The branch target must equal the tag params length plus one (for the
         // continuation). Be careful to avoid overflow.
@@ -4094,10 +4339,11 @@ inline bool OpIter<Policy>::readBrOnCast(bool onSuccess,
   // Get the branch target type, which will also determine the type of extra
   // values that are passed along on branch.
   Control* block = nullptr;
-  if (!getControl(*labelRelativeDepth, &block)) {
+  uint32_t labelIndex;
+  if (!getControl(*labelRelativeDepth, &block, &labelIndex)) {
     return false;
   }
-  *labelType = block->branchTargetType();
+  *labelType = block->branchTargetType(labelIndex);
 
   // Check we have at least one value slot in the branch target type, so as to
   // receive the casted or non-casted type when we branch.

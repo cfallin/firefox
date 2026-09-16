@@ -986,6 +986,14 @@ bool OptimizeMIR(MIRGenerator* mir) {
   mir->spewPass("BuildSSA");
   AssertBasicGraphCoherency(graph);
 
+  if (graph.hasIrreducibleCFG()) {
+    if (!PruneUnreachableBlocks(mir, graph)) {
+      return false;
+    }
+    mir->spewPass("Prune Unreachable Blocks");
+    AssertBasicGraphCoherency(graph);
+  }
+
   if (JitSpewEnabled(JitSpew_MIRExpressions)) {
     JitSpew(JitSpew_MIRExpressions, "\n");
     AutoJitSpewMessage msg(JitSpew_MIRExpressions);

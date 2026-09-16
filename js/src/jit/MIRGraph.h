@@ -715,6 +715,7 @@ class MIRGraph {
 
   size_t numBlocks_;
   bool hasTryBlock_;
+  bool hasIrreducibleCFG_;
 
   InlineList<MPhi> phiFreeList_;
   size_t phiFreeListLength_;
@@ -728,6 +729,7 @@ class MIRGraph {
         osrBlock_(nullptr),
         numBlocks_(0),
         hasTryBlock_(false),
+        hasIrreducibleCFG_(false),
         phiFreeListLength_(0) {}
 
   TempAllocator& alloc() const { return *alloc_; }
@@ -799,6 +801,9 @@ class MIRGraph {
 
   bool hasTryBlock() const { return hasTryBlock_; }
   void setHasTryBlock() { hasTryBlock_ = true; }
+
+  bool hasIrreducibleCFG() const { return hasIrreducibleCFG_; }
+  void setHasIrreducibleCFG() { hasIrreducibleCFG_ = true; }
 
   void dump(GenericPrinter& out);
   void dump();

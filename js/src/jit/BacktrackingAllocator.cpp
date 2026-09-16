@@ -1782,6 +1782,91 @@ static bool IsInputReused(LInstruction* ins, LUse* use) {
 bool BacktrackingAllocator::buildLivenessInfo() {
   JitSpew(JitSpew_RegAlloc, "Beginning liveness analysis");
 
+  bool hasIrreducibleCFG = mir->graph().hasIrreducibleCFG();
+  Vector<VirtualRegBitSet, 0, JitAllocPolicy> irreducibleLiveIn(mir->alloc());
+  Vector<VirtualRegBitSet, 0, JitAllocPolicy> defined(mir->alloc());
+  if (hasIrreducibleCFG) {
+    if (!irreducibleLiveIn.growBy(graph.numBlocks()) ||
+        !defined.growBy(graph.numBlocks())) {
+      return false;
+    }
+
+    for (size_t i = 0; i < graph.numBlocks(); i++) {
+      LBlock* block = graph.getBlock(i);
+      uint32_t id = block->mir()->id();
+
+      for (size_t j = 0; j < block->numPhis(); j++) {
+        if (!defined[id].insert(
+                block->getPhi(j)->getDef(0)->virtualRegister())) {
+          return false;
+        }
+      }
+
+      for (LInstructionIterator ins = block->begin(); ins != block->end();
+           ins++) {
+        for (LInstruction::InputIter input(**ins); input.more(); input.next()) {
+          if (!input->isUse() ||
+              input->toUse()->policy() == LUse::RECOVERED_INPUT) {
+            continue;
+          }
+          uint32_t reg = input->toUse()->virtualRegister();
+          if (!defined[id].contains(reg) &&
+              !irreducibleLiveIn[id].insert(reg)) {
+            return false;
+          }
+        }
+        for (LInstruction::OutputIter output(*ins); !output.done(); output++) {
+          if (!defined[id].insert(output->virtualRegister())) {
+            return false;
+          }
+        }
+        for (LInstruction::TempIter temp(*ins); !temp.done(); temp++) {
+          if (!defined[id].insert(temp->virtualRegister())) {
+            return false;
+          }
+        }
+      }
+
+      MBasicBlock* mblock = block->mir();
+      if (mblock->successorWithPhis()) {
+        LBlock* successor = mblock->successorWithPhis()->lir();
+        for (size_t j = 0; j < successor->numPhis(); j++) {
+          LUse* use = successor->getPhi(j)
+                          ->getOperand(mblock->positionInPhiSuccessor())
+                          ->toUse();
+          uint32_t reg = use->virtualRegister();
+          if (!defined[id].contains(reg) &&
+              !irreducibleLiveIn[id].insert(reg)) {
+            return false;
+          }
+        }
+      }
+    }
+
+    bool changed;
+    do {
+      changed = false;
+      for (size_t i = graph.numBlocks(); i > 0; i--) {
+        MBasicBlock* block = graph.getBlock(i - 1)->mir();
+        VirtualRegBitSet& live = irreducibleLiveIn[block->id()];
+        for (size_t j = 0; j < block->numSuccessors(); j++) {
+          MBasicBlock* successor = block->getSuccessor(j);
+          for (VirtualRegBitSet::Iterator reg(
+                   irreducibleLiveIn[successor->id()]);
+               reg; ++reg) {
+            if (!defined[block->id()].contains(*reg) &&
+                !live.contains(*reg)) {
+              if (!live.insert(*reg)) {
+                return false;
+              }
+              changed = true;
+            }
+          }
+        }
+      }
+    } while (changed);
+  }
+
   // The callPositions vector and the safepoint vectors are initialized from
   // index |length - 1| to 0, to ensure they are sorted.
   if (!callPositions.growByUninitialized(graph.numCallInstructions()) ||
@@ -1806,9 +1891,11 @@ bool BacktrackingAllocator::buildLivenessInfo() {
     // Propagate liveIn from our successors to us.
     for (size_t i = 0; i < mblock->lastIns()->numSuccessors(); i++) {
       MBasicBlock* successor = mblock->lastIns()->getSuccessor(i);
-      // Skip backedges, as we fix them up at the loop header.
-      if (mblock->id() < successor->id()) {
-        if (!live.insertAll(liveIn[successor->id()])) {
+      if (hasIrreducibleCFG || mblock->id() < successor->id()) {
+        const VirtualRegBitSet& successorLive =
+            hasIrreducibleCFG ? irreducibleLiveIn[successor->id()]
+                              : liveIn[successor->id()];
+        if (!live.insertAll(successorLive)) {
           return false;
         }
       }

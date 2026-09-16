@@ -501,6 +501,86 @@ bool jit::PruneUnusedBranches(const MIRGenerator* mir, MIRGraph& graph) {
   return true;
 }
 
+bool jit::PruneUnreachableBlocks(const MIRGenerator* mir, MIRGraph& graph) {
+  Vector<MBasicBlock*, 16, SystemAllocPolicy> worklist;
+  uint32_t numMarked = 0;
+
+  graph.entryBlock()->mark();
+  numMarked++;
+  if (!worklist.append(graph.entryBlock())) {
+    return false;
+  }
+
+  while (!worklist.empty()) {
+    if (mir->shouldCancel("Prune unreachable blocks")) {
+      return false;
+    }
+    MBasicBlock* block = worklist.popCopy();
+    for (size_t i = 0; i < block->numSuccessors(); i++) {
+      MBasicBlock* successor = block->getSuccessor(i);
+      if (!successor->isMarked()) {
+        successor->mark();
+        numMarked++;
+        if (!worklist.append(successor)) {
+          return false;
+        }
+      }
+    }
+  }
+
+  if (numMarked != graph.numBlocks()) {
+    for (PostorderIterator iter(graph.poBegin()); iter != graph.poEnd();) {
+      MBasicBlock* block = *iter++;
+      if (block->isMarked()) {
+        continue;
+      }
+      for (size_t i = 0; i < block->numSuccessors(); i++) {
+        MBasicBlock* successor = block->getSuccessor(i);
+        if (!successor->isDead()) {
+          successor->removePredecessor(block);
+        }
+      }
+      graph.removeBlock(block);
+    }
+  }
+  graph.unmarkBlocks();
+
+  using DFSFrame = std::pair<MBasicBlock*, size_t>;
+  Vector<DFSFrame, 16, SystemAllocPolicy> dfs;
+  Vector<MBasicBlock*, 16, SystemAllocPolicy> postorder;
+  graph.entryBlock()->mark();
+  if (!dfs.emplaceBack(graph.entryBlock(), 0)) {
+    return false;
+  }
+  while (!dfs.empty()) {
+    DFSFrame& frame = dfs.back();
+    if (frame.second < frame.first->numSuccessors()) {
+      MBasicBlock* successor = frame.first->getSuccessor(frame.second++);
+      if (!successor->isMarked()) {
+        successor->mark();
+        if (!dfs.emplaceBack(successor, 0)) {
+          return false;
+        }
+      }
+      continue;
+    }
+    if (!postorder.append(frame.first)) {
+      return false;
+    }
+    dfs.popBack();
+  }
+  MOZ_ASSERT(postorder.length() == graph.numBlocks());
+  graph.unmarkBlocks();
+
+  for (MBasicBlock* block : graph) {
+    block->setId(1);
+  }
+  for (size_t i = postorder.length(); i > 0; i--) {
+    graph.moveBlockToEnd(postorder[i - 1]);
+  }
+  return true;
+}
+
 // Remove all blocks not marked with isMarked(). Unmark all remaining blocks.
 // Alias analysis dependencies may be invalid after calling this function.
 bool jit::RemoveUnmarkedBlocks(const MIRGenerator* mir, MIRGraph& graph,

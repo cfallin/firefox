@@ -97,6 +97,10 @@ bool SemiNCA::initStateAndRenumberBlocks() {
 
   // Append all root blocks to the work list.
   constexpr size_t RootId = 0;
+  bool markOnAppend = graph_.hasIrreducibleCFG();
+  if (markOnAppend) {
+    graph_.entryBlock()->mark();
+  }
   if (!worklist.emplaceBack(graph_.entryBlock(), RootId)) {
     return false;
   }
@@ -124,7 +128,9 @@ bool SemiNCA::initStateAndRenumberBlocks() {
   uint32_t id = 1;
   while (!worklist.empty()) {
     auto [block, parent] = worklist.popCopy();
-    block->mark();
+    if (!markOnAppend) {
+      block->mark();
+    }
     block->setId(id);
     state_[id] = {
         .block = block, .ancestor = parent, .label = id, .idom = parent};
@@ -133,6 +139,9 @@ bool SemiNCA::initStateAndRenumberBlocks() {
       MBasicBlock* succ = block->getSuccessor(i);
       if (succ->isMarked()) {
         continue;
+      }
+      if (markOnAppend) {
+        succ->mark();
       }
       if (!worklist.emplaceBack(succ, id)) {
         return false;

@@ -1726,6 +1726,9 @@ static void AssertReversePostorder(MIRGraph& graph) {
     for (size_t i = 0; i < block->numPredecessors(); i++) {
       MBasicBlock* pred = block->getPredecessor(i);
       if (!pred->isMarked()) {
+        if (graph.hasIrreducibleCFG()) {
+          continue;
+        }
         MOZ_ASSERT(pred->isLoopBackedge());
         MOZ_ASSERT(block->backedge() == pred);
       }

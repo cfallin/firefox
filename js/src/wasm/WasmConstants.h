@@ -943,8 +943,14 @@ enum class MiscOp {
   I64MulWideS = 21,  // 0x15
   I64MulWideU = 22,  // 0x16
 
+  // Experimental multiloop proposal.
+  MultiLoop = 0x17,
+  Label = 0x18,
+
   Limit
 };
+
+static constexpr uint32_t MaxMultiLoopBodies = 100000;
 
 // Opcodes from threads proposal as of June 30, 2017
 enum class ThreadOp {

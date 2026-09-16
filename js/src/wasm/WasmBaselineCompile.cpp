@@ -4177,6 +4177,69 @@ bool BaseCompiler::emitLoop() {
   return true;
 }
 
+bool BaseCompiler::emitMultiLoop() {
+  uint32_t bodyCount;
+  if (!iter_.readMultiLoop(&bodyCount)) {
+    return false;
+  }
+
+  if (!deadCode_) {
+    sync();
+  }
+
+  Control& control = controlItem();
+  initControl(control, iter_.currentMultiLoopBodyType(0).params());
+  if (!control.multiLoopLabels.resize(bodyCount)) {
+    return false;
+  }
+  bceSafe_ = 0;
+  return true;
+}
+
+bool BaseCompiler::emitLabel() {
+  uint32_t bodyIndex;
+  ResultType params;
+  ResultType previousResults;
+  BaseNothingVector unusedValues;
+  if (!iter_.readLabel(&bodyIndex, &params, &previousResults,
+                       &unusedValues)) {
+    return false;
+  }
+
+  Control& control = controlItem();
+  if (bodyIndex == 0) {
+    if (deadCode_) {
+      return true;
+    }
+    if (!topBlockParams(params)) {
+      return false;
+    }
+  } else if (control.deadOnArrival) {
+    return true;
+  } else if (deadCode_) {
+    fr.resetStackHeight(control.stackHeight, params);
+    popValueStackTo(control.stackSize);
+  } else {
+    MOZ_ASSERT(stk_.length() == control.stackSize + params.length());
+    popBlockResults(params, control.stackHeight,
+                    ContinuationKind::Fallthrough);
+  }
+
+  masm.nopAlign(CodeAlignment);
+  masm.bind(&control.multiLoopLabels[bodyIndex]);
+  if (bodyIndex != 0) {
+    if (deadCode_) {
+      captureResultRegisters(params);
+      deadCode_ = false;
+    }
+    if (!pushBlockResults(params)) {
+      return false;
+    }
+  }
+  sync();
+  return addInterruptCheck();
+}
+
 // The bodies of the "then" and "else" arms can be arbitrary sequences
 // of expressions, they push control and increment the nesting and can
 // even be targeted by jumps.  A branch to the "if" block branches to
@@ -4431,6 +4494,9 @@ bool BaseCompiler::emitEnd() {
       iter_.popEnd();
       break;
     }
+    case LabelKind::MultiLoop:
+      iter_.popEnd();
+      break;
     case LabelKind::Then:
       if (!endIfThen(type)) {
         return false;
@@ -4481,7 +4547,7 @@ bool BaseCompiler::emitBr() {
   // returned normally.
 
   popBlockResults(type, target.stackHeight, ContinuationKind::Jump);
-  masm.jump(&target.label);
+  masm.jump(&branchLabel(relativeDepth));
 
   // The registers holding the join values are free for the remainder of this
   // block.
@@ -4511,7 +4577,8 @@ bool BaseCompiler::emitBrIf() {
   Control& target = controlItem(relativeDepth);
   target.bceSafeOnExit &= bceSafe_;
 
-  BranchState b(&target.label, target.stackHeight, InvertBranch(false), type);
+  BranchState b(&branchLabel(relativeDepth), target.stackHeight,
+                InvertBranch(false), type);
   emitBranchSetup(&b);
   return emitBranchPerform(&b);
 }
@@ -4535,7 +4602,8 @@ bool BaseCompiler::emitBrOnNull() {
   Control& target = controlItem(relativeDepth);
   target.bceSafeOnExit &= bceSafe_;
 
-  BranchState b(&target.label, target.stackHeight, InvertBranch(false), type);
+  BranchState b(&branchLabel(relativeDepth), target.stackHeight,
+                InvertBranch(false), type);
   if (b.hasBlockResults()) {
     needResultRegisters(b.resultType);
   }
@@ -4571,7 +4639,8 @@ bool BaseCompiler::emitBrOnNonNull() {
   Control& target = controlItem(relativeDepth);
   target.bceSafeOnExit &= bceSafe_;
 
-  BranchState b(&target.label, target.stackHeight, InvertBranch(false), type);
+  BranchState b(&branchLabel(relativeDepth), target.stackHeight,
+                InvertBranch(false), type);
   MOZ_ASSERT(b.hasBlockResults(), "br_on_non_null has block results");
 
   // Don't allocate the result register used in the branch
@@ -4643,7 +4712,7 @@ bool BaseCompiler::emitBrTable() {
   shuffleStackResultsBeforeBranch(
       resultsBase, controlItem(defaultDepth).stackHeight, branchParams);
   controlItem(defaultDepth).bceSafeOnExit &= bceSafe_;
-  masm.jump(&controlItem(defaultDepth).label);
+  masm.jump(&branchLabel(defaultDepth));
 
   // Emit stubs.  rc is dead in all of these but we don't need it.
   //
@@ -4664,7 +4733,7 @@ bool BaseCompiler::emitBrTable() {
     shuffleStackResultsBeforeBranch(resultsBase, controlItem(depth).stackHeight,
                                     branchParams);
     controlItem(depth).bceSafeOnExit &= bceSafe_;
-    masm.jump(&controlItem(depth).label);
+    masm.jump(&branchLabel(depth));
   }
 
   // Emit table.
@@ -4799,7 +4868,7 @@ bool BaseCompiler::emitTryTable() {
 
       // Pop the results needed for the target branch and perform the jump
       popBlockResults(labelParams, target.stackHeight, ContinuationKind::Jump);
-      masm.jump(&target.label);
+      masm.jump(&branchLabel(tryTableCatch.labelRelativeDepth));
       freeResultRegisters(labelParams);
 
       // Break from the loop and skip the implicit rethrow that's needed
@@ -4899,7 +4968,7 @@ bool BaseCompiler::emitTryTable() {
 
     // Pop the results needed for the target branch and perform the jump
     popBlockResults(labelParams, target.stackHeight, ContinuationKind::Jump);
-    masm.jump(&target.label);
+    masm.jump(&branchLabel(tryTableCatch.labelRelativeDepth));
     freeResultRegisters(labelParams);
 
     // Reset the stack height for the skip to the next catch handler
@@ -9364,7 +9433,8 @@ bool BaseCompiler::emitBrOnCastCommon(bool onSuccess,
   target.bceSafeOnExit &= bceSafe_;
 
   // 3. br_if $l : [T*, ref] -> [T*, ref]
-  BranchState b(&target.label, target.stackHeight, InvertBranch(false),
+  BranchState b(&branchLabel(labelRelativeDepth), target.stackHeight,
+                InvertBranch(false),
                 labelType);
 
   // Don't allocate the result register used in the branch
@@ -12312,6 +12382,16 @@ bool BaseCompiler::emitBody() {
               return iter_.unrecognizedOpcode(&op);
             }
             CHECK_NEXT(emitI64MulWide(/*isSigned=*/false));
+          case uint32_t(MiscOp::MultiLoop):
+            if (!codeMeta_.multiLoopEnabled()) {
+              return iter_.unrecognizedOpcode(&op);
+            }
+            CHECK_NEXT(emitMultiLoop());
+          case uint32_t(MiscOp::Label):
+            if (!codeMeta_.multiLoopEnabled()) {
+              return iter_.unrecognizedOpcode(&op);
+            }
+            CHECK_NEXT(emitLabel());
           default:
             break;
         }  // switch (op.b1)
