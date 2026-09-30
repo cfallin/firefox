@@ -358,6 +358,10 @@ class Shape : public gc::CellWithTenuredGCPointer<gc::TenuredCell, BaseShape> {
     SMALL_SLOTSPAN_MAX = 0x3ff,  // 10 bits.
     SMALL_SLOTSPAN_SHIFT = 11,
     SMALL_SLOTSPAN_MASK = uint32_t(SMALL_SLOTSPAN_MAX << SMALL_SLOTSPAN_SHIFT),
+
+    // For NativeShape: mirrors ObjectFlag::PermutedSlots, so that code reading
+    // the slot span from this word can test both at once.
+    PERMUTED_SLOTS_BIT = 1 << 21,
   };
 
   uint32_t immutableFlags;   // Immutable flags, see above.
@@ -399,6 +403,15 @@ class Shape : public gc::CellWithTenuredGCPointer<gc::TenuredCell, BaseShape> {
   ObjectFlags objectFlags() const { return objectFlags_; }
   bool hasObjectFlag(ObjectFlag flag) const {
     return objectFlags_.hasFlag(flag);
+  }
+
+  // See ObjectFlag::PermutedSlots.
+  bool hasPermutedSlots() const {
+#ifdef JS_EXTERNAL_COMPILER_HOOKS
+    return objectFlags_.hasFlag(ObjectFlag::PermutedSlots);
+#else
+    return false;
+#endif
   }
 
  protected:
@@ -495,6 +508,9 @@ class NativeShape : public Shape {
     MOZ_ASSERT(base->clasp()->isNativeObject());
     MOZ_ASSERT(mapLength <= PropMap::Capacity);
     immutableFlags |= (nfixed << FIXED_SLOTS_SHIFT) | mapLength;
+    if (hasPermutedSlots()) {
+      immutableFlags |= PERMUTED_SLOTS_BIT;
+    }
   }
 
  public:
@@ -520,6 +536,11 @@ class NativeShape : public Shape {
   // For JIT usage.
   static constexpr uint32_t fixedSlotsMask() { return FIXED_SLOTS_MASK; }
   static constexpr uint32_t fixedSlotsShift() { return FIXED_SLOTS_SHIFT; }
+  static constexpr uint32_t smallSlotSpanMask() { return SMALL_SLOTSPAN_MASK; }
+  static constexpr uint32_t smallSlotSpanShift() {
+    return SMALL_SLOTSPAN_SHIFT;
+  }
+  static constexpr uint32_t permutedSlotsBit() { return PERMUTED_SLOTS_BIT; }
 };
 
 // Shared shape for a NativeObject.
@@ -572,6 +593,9 @@ class SharedShape : public NativeShape {
   uint32_t slotSpanSlow() const {
     MOZ_ASSERT(isShared());
     const JSClass* clasp = getObjectClass();
+    if (MOZ_UNLIKELY(hasPermutedSlots())) {
+      return SharedPropMap::permutedSlotSpan(clasp, propMap(), propMapLength());
+    }
     return SharedPropMap::slotSpan(clasp, propMap(), propMapLength());
   }
   uint32_t slotSpan() const {
@@ -584,6 +608,21 @@ class SharedShape : public NativeShape {
     }
     return slotSpanSlow();
   }
+
+#ifdef JS_EXTERNAL_COMPILER_HOOKS
+  // The shape that adds property `id` with `flags` to `shape` in slot `slot`
+  // instead of at the slot span: for an external tier that manages object
+  // layouts itself. `slot` must not be a reserved slot or in use in `shape`;
+  // slots between the span and `slot` become holes. A slot other than the
+  // span sets ObjectFlag::PermutedSlots on the result. Returns true with a
+  // null *result, and no exception, when the placement is not possible (the
+  // slot is in use, `id` is already present, or the property map cannot hold
+  // the slot number).
+  static bool getShapeWithPropertyAtSlot(JSContext* cx,
+                                         Handle<SharedShape*> shape,
+                                         HandleId id, PropertyFlags flags,
+                                         uint32_t slot, SharedShape** result);
+#endif
 
   /*
    * Lookup an initial shape matching the given parameters, creating an empty

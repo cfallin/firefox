@@ -690,6 +690,18 @@ class SharedPropMap : public PropMap {
     return std::max(lastSlot + 1, numReserved);
   }
 
+  // The slot span of a map whose slots may not follow insertion order
+  // (ObjectFlag::PermutedSlots): the highest slot plus one. Linear in the
+  // number of properties.
+  static uint32_t permutedSlotSpan(const JSClass* clasp,
+                                   const SharedPropMap* map,
+                                   uint32_t mapLength);
+
+  // Whether no property of map/mapLength has slot `slot`. Linear in the number
+  // of properties.
+  static bool slotIsUnused(const SharedPropMap* map, uint32_t mapLength,
+                           uint32_t slot);
+
   static uint32_t indexOfNextProperty(uint32_t index) {
     MOZ_ASSERT(index < PropMap::Capacity);
     return (index + 1) % PropMap::Capacity;
@@ -697,10 +709,26 @@ class SharedPropMap : public PropMap {
 
   // Add a new property to this map. Returns the new map/mapLength, slot number,
   // and object flags.
+  //
+  // The new property takes slot `slotSpan`, the span of the shape being
+  // extended (the map's last slot plus one, unless the shape has
+  // ObjectFlag::PermutedSlots).
   static bool addProperty(JSContext* cx, const JSClass* clasp,
                           MutableHandle<SharedPropMap*> map,
                           uint32_t* mapLength, HandleId id, PropertyFlags flags,
-                          ObjectFlags* objectFlags, uint32_t* slot);
+                          uint32_t slotSpan, ObjectFlags* objectFlags,
+                          uint32_t* slot);
+
+  // Like addProperty, but in a slot of the caller's choosing, which no
+  // property of the map may use. A slot other than the span sets
+  // ObjectFlag::PermutedSlots. Returns true with a null map, and no exception
+  // pending, if the map cannot hold the slot (a CompactPropMap holds small
+  // slot numbers only).
+  static bool addPropertyAtSlot(JSContext* cx, const JSClass* clasp,
+                                MutableHandle<SharedPropMap*> map,
+                                uint32_t* mapLength, HandleId id,
+                                PropertyFlags flags, uint32_t slot,
+                                uint32_t slotSpan, ObjectFlags* objectFlags);
 
   // Like addProperty, but for when the slot number is a reserved slot. A few
   // builtin objects use this for initial properties.

@@ -309,7 +309,9 @@ static PlainObject* NewPlainObjectWithProperties(
     }
   }
 
-  if (canCache && !obj->inDictionaryMode()) {
+  // The cache's users store property i in slot i.
+  if (canCache && !obj->inDictionaryMode() &&
+      !obj->shape()->hasPermutedSlots()) {
     MOZ_ASSERT(obj->getDenseInitializedLength() == 0);
     MOZ_ASSERT(obj->slotSpan() == properties.length());
     cache.add(obj->sharedShape());

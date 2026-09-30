@@ -2345,7 +2345,10 @@ static bool TryAddOrSetPlainObjectProperty(JSContext* cx,
   bool res = AddDataPropertyToPlainObject(cx, obj, keyRoot, value, &resultSlot);
 
   if constexpr (UseCache) {
+    // A transition to permuted slots may skip slots (initialized by the add)
+    // that a cached replay would leave alone.
     if (res && obj->shape()->isShared() &&
+        !obj->shape()->hasPermutedSlots() &&
         resultSlot < SharedPropMap::MaxPropsForNonDictionary &&
         !Watchtower::watchesPropertyAdd(obj)) {
       TaggedSlotOffset offset = obj->getTaggedSlotOffset(resultSlot);

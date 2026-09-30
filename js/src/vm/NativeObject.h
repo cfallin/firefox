@@ -1058,6 +1058,15 @@ class NativeObject : public JSObject {
     return addProperty(cx, obj, id, flags, slotOut);
   }
 
+#ifdef JS_EXTERNAL_COMPILER_HOOKS
+  // Add the property that `newShape` (from
+  // SharedShape::getShapeWithPropertyAtSlot on the object's shape) adds, in
+  // that shape's slot, which is returned in *slot holding undefined. Slots
+  // the new span skips are initialized to undefined.
+  static bool addPropertyWithShape(JSContext* cx, Handle<NativeObject*> obj,
+                                   SharedShape* newShape, uint32_t* slot);
+#endif
+
   static bool addPropertyInReservedSlot(JSContext* cx,
                                         Handle<NativeObject*> obj, HandleId id,
                                         uint32_t slot, PropertyFlags flags);

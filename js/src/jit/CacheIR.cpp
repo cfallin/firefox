@@ -5609,6 +5609,11 @@ AttachDecision SetPropIRGenerator::tryAttachAddSlotStub(
     return AttachDecision::NoAction;
   }
 
+  // Add stubs store only the new property's slot, which is the old span.
+  if (holder->shape()->hasPermutedSlots()) {
+    return AttachDecision::NoAction;
+  }
+
   SharedShape* oldSharedShape = &oldShape->asShared();
 
   // The property must be the last added property of the object.

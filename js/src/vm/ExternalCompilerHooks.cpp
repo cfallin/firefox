@@ -10,6 +10,7 @@
 #include "vm/JSObject.h"
 #include "vm/NativeObject.h"
 #include "vm/Runtime.h"
+#include "vm/Shape.h"
 
 using namespace js;
 
@@ -89,4 +90,39 @@ JS_PUBLIC_API void js::ExternalPropertyAdded(JSContext* cx, NativeObject* obj,
   if (hooks && hooks->propertyAdded) {
     hooks->propertyAdded(cx, obj, id, slot, obj->numFixedSlots());
   }
+}
+
+JS_PUBLIC_API bool js::ExternalShapeForAdd(JSContext* cx,
+                                           JS::Handle<NativeObject*> obj,
+                                           JS::HandleId id, uint8_t flags,
+                                           SharedShape** result) {
+  *result = nullptr;
+  JS::ExternalCompilerHooks* hooks = cx->externalCompilerHooks();
+  if (!hooks || !hooks->shapeForAdd) {
+    return true;
+  }
+  if (!hooks->shapeForAdd(cx, obj, id, flags, result)) {
+    return false;
+  }
+  if (SharedShape* shape = *result) {
+    // Cheap validation of the tier's answer; addPropertyWithShape checks
+    // that the shape extends the object's by one property.
+    PropertyInfoWithKey prop = shape->lastProperty();
+    MOZ_RELEASE_ASSERT(prop.key() == id.get());
+    MOZ_RELEASE_ASSERT(prop.flags().toRaw() == flags);
+  }
+  return true;
+}
+
+JS_PUBLIC_API bool js::ExternalShapeWithPropertyAtSlot(
+    JSContext* cx, JS::Handle<SharedShape*> shape, JS::HandleId id,
+    uint8_t flags, uint32_t slot, SharedShape** result) {
+  return SharedShape::getShapeWithPropertyAtSlot(
+      cx, shape, id, PropertyFlags::fromRaw(flags), slot, result);
+}
+
+JS_PUBLIC_API bool js::ExternalAddPropertyWithShape(
+    JSContext* cx, JS::Handle<NativeObject*> obj, SharedShape* newShape,
+    uint32_t* slot) {
+  return NativeObject::addPropertyWithShape(cx, obj, newShape, slot);
 }

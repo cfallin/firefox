@@ -240,14 +240,61 @@ bool SharedPropMap::addChild(JSContext* cx, SharedPropMapAndIndex child,
 }
 
 // static
+uint32_t SharedPropMap::permutedSlotSpan(const JSClass* clasp,
+                                         const SharedPropMap* map,
+                                         uint32_t mapLength) {
+  MOZ_ASSERT(clasp->isNativeObject());
+  uint32_t span = JSCLASS_RESERVED_SLOTS(clasp);
+  const SharedPropMap* cur = map;
+  uint32_t len = mapLength;
+  while (cur) {
+    for (uint32_t i = 0; i < len; i++) {
+      PropertyInfo prop = cur->getPropertyInfo(i);
+      if (prop.hasSlot()) {
+        span = std::max(span, prop.slot() + 1);
+      }
+    }
+    if (!cur->hasPrevious()) {
+      break;
+    }
+    cur = cur->asNormal()->previous();
+    len = PropMap::Capacity;
+  }
+  return span;
+}
+
+// static
+bool SharedPropMap::slotIsUnused(const SharedPropMap* map, uint32_t mapLength,
+                                 uint32_t slot) {
+  const SharedPropMap* cur = map;
+  uint32_t len = mapLength;
+  while (cur) {
+    for (uint32_t i = 0; i < len; i++) {
+      PropertyInfo prop = cur->getPropertyInfo(i);
+      if (prop.hasSlot() && prop.slot() == slot) {
+        return false;
+      }
+    }
+    if (!cur->hasPrevious()) {
+      break;
+    }
+    cur = cur->asNormal()->previous();
+    len = PropMap::Capacity;
+  }
+  return true;
+}
+
+// static
 bool SharedPropMap::addProperty(JSContext* cx, const JSClass* clasp,
                                 MutableHandle<SharedPropMap*> map,
                                 uint32_t* mapLength, HandleId id,
-                                PropertyFlags flags, ObjectFlags* objectFlags,
-                                uint32_t* slot) {
+                                PropertyFlags flags, uint32_t slotSpan,
+                                ObjectFlags* objectFlags, uint32_t* slot) {
   MOZ_ASSERT(!flags.isCustomDataProperty());
+  MOZ_ASSERT_IF(!objectFlags->hasFlag(ObjectFlag::PermutedSlots),
+                slotSpan == SharedPropMap::slotSpan(clasp, map, *mapLength));
 
-  *slot = SharedPropMap::slotSpan(clasp, map, *mapLength);
+  *slot = slotSpan;
 
   if (MOZ_UNLIKELY(*slot > SHAPE_MAXIMUM_SLOT)) {
     ReportAllocationOverflow(cx);
@@ -258,6 +305,40 @@ bool SharedPropMap::addProperty(JSContext* cx, const JSClass* clasp,
       GetObjectFlagsForNewProperty(clasp, *objectFlags, id, flags, cx);
 
   PropertyInfo prop = PropertyInfo(flags, *slot);
+  return addPropertyInternal(cx, map, mapLength, id, prop);
+}
+
+// static
+bool SharedPropMap::addPropertyAtSlot(JSContext* cx, const JSClass* clasp,
+                                      MutableHandle<SharedPropMap*> map,
+                                      uint32_t* mapLength, HandleId id,
+                                      PropertyFlags flags, uint32_t slot,
+                                      uint32_t slotSpan,
+                                      ObjectFlags* objectFlags) {
+  MOZ_ASSERT(!flags.isCustomDataProperty());
+  MOZ_ASSERT(slot >= JSCLASS_RESERVED_SLOTS(clasp));
+  MOZ_ASSERT(slot <= SHAPE_MAXIMUM_SLOT);
+  MOZ_ASSERT_IF(slot < slotSpan, slotIsUnused(map, *mapLength, slot));
+
+  // A new entry in a CompactPropMap (the first map of the chain, or its clone)
+  // must fit its small slot field; SharedPropMap::create uses one for a first
+  // property at or below this bound. Generic adds after it take the span, so
+  // with at most Capacity entries no slot there exceeds MaxSlotNumber.
+  static constexpr uint32_t MaxCompactSlot =
+      CompactPropertyInfo::MaxSlotNumber - (PropMap::Capacity - 1);
+  if (map && map->isCompact() && *mapLength < PropMap::Capacity &&
+      slot > MaxCompactSlot) {
+    map.set(nullptr);
+    return true;
+  }
+
+  *objectFlags =
+      GetObjectFlagsForNewProperty(clasp, *objectFlags, id, flags, cx);
+  if (slot != slotSpan) {
+    objectFlags->setFlag(ObjectFlag::PermutedSlots);
+  }
+
+  PropertyInfo prop = PropertyInfo(flags, slot);
   return addPropertyInternal(cx, map, mapLength, id, prop);
 }
 
@@ -292,7 +373,8 @@ bool SharedPropMap::addPropertyWithKnownSlot(JSContext* cx,
                                      objectFlags);
   }
 
-  MOZ_ASSERT(slot == SharedPropMap::slotSpan(clasp, map, *mapLength));
+  MOZ_ASSERT_IF(!objectFlags->hasFlag(ObjectFlag::PermutedSlots),
+                slot == SharedPropMap::slotSpan(clasp, map, *mapLength));
   MOZ_RELEASE_ASSERT(slot <= SHAPE_MAXIMUM_SLOT);
 
   *objectFlags =
@@ -1316,7 +1398,8 @@ void PropMap::checkConsistency(NativeObject* obj) const {
       if (prop.hasSlot()) {
         MOZ_ASSERT_IF((curMap != this || index < mapLength),
                       prop.slot() < obj->slotSpan());
-        MOZ_ASSERT_IF(nextSlot.isSome(), *nextSlot >= prop.slot());
+        MOZ_ASSERT_IF(nextSlot.isSome() && !obj->shape()->hasPermutedSlots(),
+                      *nextSlot >= prop.slot());
         nextSlot = mozilla::Some(prop.slot());
       }
 

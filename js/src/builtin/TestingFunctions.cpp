@@ -8545,6 +8545,75 @@ static bool NumAllocSitesPretenured(JSContext* cx, unsigned argc, Value* vp) {
   return true;
 }
 
+#ifdef JS_EXTERNAL_COMPILER_HOOKS
+// addPropertyAtSlot(obj, key, slot): add a writable, enumerable, configurable
+// data property `key` (value undefined) to plain object `obj` in slot `slot`
+// (SharedShape::getShapeWithPropertyAtSlot). Returns whether it was placed.
+static bool AddPropertyAtSlot(JSContext* cx, unsigned argc, Value* vp) {
+  CallArgs args = CallArgsFromVp(argc, vp);
+  if (args.length() != 3 || !args[0].isObject() ||
+      !args[0].toObject().is<PlainObject>() || !args[2].isInt32() ||
+      args[2].toInt32() < 0) {
+    JS_ReportErrorASCII(cx,
+                        "addPropertyAtSlot: expected (plain object, key, "
+                        "slot)");
+    return false;
+  }
+  Rooted<NativeObject*> obj(cx, &args[0].toObject().as<NativeObject>());
+  RootedId id(cx);
+  if (!ToPropertyKey(cx, args[1], &id)) {
+    return false;
+  }
+  if (id.isInt() || obj->inDictionaryMode() || !obj->isExtensible() ||
+      obj->containsPure(id)) {
+    args.rval().setBoolean(false);
+    return true;
+  }
+  Rooted<SharedShape*> shape(cx, obj->sharedShape());
+  SharedShape* newShape = nullptr;
+  if (!SharedShape::getShapeWithPropertyAtSlot(
+          cx, shape, id, PropertyFlags::defaultDataPropFlags,
+          uint32_t(args[2].toInt32()), &newShape)) {
+    return false;
+  }
+  if (!newShape) {
+    args.rval().setBoolean(false);
+    return true;
+  }
+  uint32_t slot;
+  if (!NativeObject::addPropertyWithShape(cx, obj, newShape, &slot)) {
+    return false;
+  }
+  args.rval().setBoolean(true);
+  return true;
+}
+
+// hasPermutedSlots(obj): whether obj's shape has ObjectFlag::PermutedSlots.
+static bool HasPermutedSlots(JSContext* cx, unsigned argc, Value* vp) {
+  CallArgs args = CallArgsFromVp(argc, vp);
+  if (args.length() != 1 || !args[0].isObject()) {
+    JS_ReportErrorASCII(cx, "hasPermutedSlots: expected an object");
+    return false;
+  }
+  args.rval().setBoolean(args[0].toObject().shape()->hasPermutedSlots());
+  return true;
+}
+
+// objectSlotSpan(obj): obj's slot span, or -1 for a non-native object.
+static bool ObjectSlotSpan(JSContext* cx, unsigned argc, Value* vp) {
+  CallArgs args = CallArgsFromVp(argc, vp);
+  if (args.length() != 1 || !args[0].isObject()) {
+    JS_ReportErrorASCII(cx, "objectSlotSpan: expected an object");
+    return false;
+  }
+  JSObject* obj = &args[0].toObject();
+  args.rval().setInt32(obj->is<NativeObject>()
+                           ? int32_t(obj->as<NativeObject>().slotSpan())
+                           : -1);
+  return true;
+}
+#endif
+
 static bool GetLcovInfo(JSContext* cx, unsigned argc, Value* vp) {
   CallArgs args = CallArgsFromVp(argc, vp);
 
@@ -10985,6 +11054,21 @@ JS_FOR_WASM_FEATURES(WASM_FEATURE)
 "numAllocSitesPretenured()",
 "  Return the number of allocation sites that were pretenured for the current\n"
 "  global\n"),
+
+#ifdef JS_EXTERNAL_COMPILER_HOOKS
+    JS_FN_HELP("addPropertyAtSlot", AddPropertyAtSlot, 3, 0,
+"addPropertyAtSlot(obj, key, slot)",
+"  Add data property key (value undefined) to plain object obj in the given\n"
+"  slot, not at the slot span. Returns whether it was placed.\n"),
+
+    JS_FN_HELP("hasPermutedSlots", HasPermutedSlots, 1, 0,
+"hasPermutedSlots(obj)",
+"  Return whether obj's slots may not follow property insertion order.\n"),
+
+    JS_FN_HELP("objectSlotSpan", ObjectSlotSpan, 1, 0,
+"objectSlotSpan(obj)",
+"  Return obj's slot span (-1 for a non-native object).\n"),
+#endif
 
     JS_FN_HELP("getLcovInfo", GetLcovInfo, 1, 0,
 "getLcovInfo(global)",

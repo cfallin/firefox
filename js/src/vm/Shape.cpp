@@ -344,6 +344,19 @@ bool NativeObject::addProperty(JSContext* cx, Handle<NativeObject*> obj,
     return false;
   }
 
+#ifdef JS_EXTERNAL_COMPILER_HOOKS
+  // The external tier may place the property in a slot of its choosing.
+  if (obj->externalWord() && !obj->inDictionaryMode()) {
+    SharedShape* chosen = nullptr;
+    if (!ExternalShapeForAdd(cx, obj, id, flags.toRaw(), &chosen)) {
+      return false;
+    }
+    if (chosen) {
+      return addPropertyWithShape(cx, obj, chosen, slot);
+    }
+  }
+#endif
+
   if (auto* shape = LookupShapeForAdd(obj->shape(), id, flags, slot)) {
     if (!obj->setShapeAndAddNewSlot(cx, shape, *slot)) {
       return false;
@@ -387,7 +400,8 @@ bool NativeObject::addProperty(JSContext* cx, Handle<NativeObject*> obj,
   uint32_t mapLength = obj->shape()->propMapLength();
 
   if (!SharedPropMap::addProperty(cx, clasp, &map, &mapLength, id, flags,
-                                  &objectFlags, slot)) {
+                                  obj->sharedShape()->slotSpan(), &objectFlags,
+                                  slot)) {
     return false;
   }
 
@@ -440,6 +454,98 @@ bool NativeObject::addProperty(JSContext* cx, Handle<NativeObject*> obj,
 
   return true;
 }
+
+#ifdef JS_EXTERNAL_COMPILER_HOOKS
+/* static */
+bool SharedShape::getShapeWithPropertyAtSlot(JSContext* cx,
+                                             Handle<SharedShape*> shape,
+                                             HandleId id, PropertyFlags flags,
+                                             uint32_t slot,
+                                             SharedShape** result) {
+  *result = nullptr;
+
+  const JSClass* clasp = shape->getObjectClass();
+  MOZ_ASSERT(!flags.isCustomDataProperty());
+  if (slot < JSCLASS_RESERVED_SLOTS(clasp) || slot > SHAPE_MAXIMUM_SLOT ||
+      flags.isCustomDataProperty()) {
+    return true;
+  }
+
+  uint32_t index;
+  if (shape->lookupPure(id, &index)) {
+    return true;
+  }
+
+  Rooted<SharedPropMap*> map(cx, shape->propMap());
+  uint32_t mapLength = shape->propMapLength();
+  uint32_t span = shape->slotSpan();
+  if (slot < span && !SharedPropMap::slotIsUnused(map, mapLength, slot)) {
+    return true;
+  }
+
+  ObjectFlags objectFlags = shape->objectFlags();
+  if (!SharedPropMap::addPropertyAtSlot(cx, clasp, &map, &mapLength, id, flags,
+                                        slot, span, &objectFlags)) {
+    return false;
+  }
+  if (!map) {
+    return true;
+  }
+
+  Rooted<BaseShape*> base(cx, shape->base());
+  SharedShape* newShape = SharedShape::getPropMapShape(
+      cx, base, shape->numFixedSlots(), map, mapLength, objectFlags);
+  if (!newShape) {
+    return false;
+  }
+  MOZ_ASSERT(newShape->slotSpan() == std::max(span, slot + 1));
+  *result = newShape;
+  return true;
+}
+
+/* static */
+bool NativeObject::addPropertyWithShape(JSContext* cx,
+                                        Handle<NativeObject*> obj,
+                                        SharedShape* newShape, uint32_t* slot) {
+  MOZ_ASSERT(!obj->inDictionaryMode());
+
+  // The shape must add exactly one property to the object's shape; the
+  // external tier made it with getShapeWithPropertyAtSlot from that shape.
+  SharedShape* oldShape = obj->sharedShape();
+  MOZ_RELEASE_ASSERT(newShape->base() == oldShape->base());
+  MOZ_RELEASE_ASSERT(newShape->numFixedSlots() == oldShape->numFixedSlots());
+  MOZ_RELEASE_ASSERT(newShape->propMapLength() ==
+                     (oldShape->propMapLength() == PropMap::Capacity
+                          ? 1
+                          : oldShape->propMapLength() + 1));
+  PropertyInfoWithKey prop = newShape->lastProperty();
+  MOZ_RELEASE_ASSERT(prop.hasSlot());
+#ifdef DEBUG
+  uint32_t index;
+  MOZ_ASSERT(!oldShape->lookupPure(prop.key(), &index));
+#endif
+
+  uint32_t oldSpan = oldShape->slotSpan();
+  uint32_t newSpan = newShape->slotSpan();
+  *slot = prop.slot();
+  if (newSpan > oldSpan) {
+    // Skipped slots below the new property's become holes: undefined, as
+    // the GC traces the whole span.
+    if (!obj->setShapeAndAddNewSlots(cx, newShape, oldSpan, newSpan)) {
+      return false;
+    }
+  } else {
+    // A hole below the span: already allocated and holding undefined.
+    MOZ_RELEASE_ASSERT(newSpan == oldSpan && *slot < oldSpan);
+    obj->setShape(newShape);
+  }
+
+  if (obj->externalWord()) {
+    ExternalPropertyAdded(cx, obj, prop.key(), *slot);
+  }
+  return true;
+}
+#endif
 
 void Shape::maybeCacheIterator(JSContext* cx, PropertyIteratorObject* iter) {
   if (!cache().isNone() && !cache().isIterator()) {
@@ -599,7 +705,12 @@ bool NativeObject::changeProperty(JSContext* cx, Handle<NativeObject*> obj,
 
   bool isLast = propMap == map && propIndex == mapLength - 1;
   bool nonLastCustomProperty = oldProp.isCustomDataProperty() && !isLast;
-  if (map->isShared() && !nonLastCustomProperty && hasReasonableGap) {
+  // A custom data property getting a slot would take the span of the map
+  // before it, which with permuted slots may be in use.
+  bool permutedCustomProperty =
+      oldProp.isCustomDataProperty() && obj->shape()->hasPermutedSlots();
+  if (map->isShared() && !nonLastCustomProperty && !permutedCustomProperty &&
+      hasReasonableGap) {
     // To change a property, we get the previous propmap and then call
     // addProperty to re-add the changed property with the new flags. If it
     // is not the last property, we have to re-add all the following
@@ -620,8 +731,11 @@ bool NativeObject::changeProperty(JSContext* cx, Handle<NativeObject*> obj,
         return false;
       }
     } else {
+      uint32_t span =
+          SharedPropMap::slotSpan(clasp, resultMap, resultMapLength);
       if (!SharedPropMap::addProperty(cx, clasp, &resultMap, &resultMapLength,
-                                      id, flags, &objectFlags, slotOut)) {
+                                      id, flags, span, &objectFlags,
+                                      slotOut)) {
         return false;
       }
     }
@@ -921,8 +1035,11 @@ bool NativeObject::removeProperty(JSContext* cx, Handle<NativeObject*> obj,
     // 4) We add a new property P, reuse Shape S1, and mark P Constant.
     // 5) We use the SetSlot IC stub again but this is invalid because P is
     //    still marked Constant.
+    //
+    // With permuted slots the last property need not hold the top slot; such
+    // objects take the dictionary path below.
     if (propMap == map && propIndex == mapLength - 1 &&
-        !wasTrackedObjectFuseProp) {
+        !wasTrackedObjectFuseProp && !obj->shape()->hasPermutedSlots()) {
       MOZ_ASSERT(obj->getLastProperty().key() == id);
 
       Rooted<SharedPropMap*> sharedMap(cx, map->asShared());

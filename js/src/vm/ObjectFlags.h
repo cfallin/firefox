@@ -101,6 +101,16 @@ enum class ObjectFlag : uint32_t {
   // If set, the object may have an accessor property where the getter or setter
   // is a non-JSFunction callable object.
   HasNonFunctionAccessor = 1 << 17,
+
+  // If set, the shape's slot numbers may not follow property insertion order:
+  // a property was placed in a slot of the embedder's choosing (see
+  // SharedShape::getShapeWithPropertyAtSlot), so the slot span is the highest
+  // slot plus one, not the last property's slot plus one, and slots below the
+  // span may be holes (undefined, owned by no property). Inherited by every
+  // shape derived from one that has it. Code that assumes slot i holds the
+  // i-th property, or that the last property holds the top slot, must check
+  // it. Only set with JS_EXTERNAL_COMPILER_HOOKS.
+  PermutedSlots = 1 << 18,
 };
 
 using ObjectFlags = EnumFlags<ObjectFlag>;
